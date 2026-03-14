@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>אביבים | מרכז פיקוד וספירה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+<style>
+:root {
+  --bg:#06090d; --s1:#0b1018; --s2:#101620; --s3:#161e2a; --s4:#1d2635;
+  --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.12);
+  --text:#dde6f0; --muted:#8aa4bf; --dim:#5a7a96;
+  --accent:#2d72c8; --accent-glow:rgba(45,114,200,0.2);
+  --green:#1db954; --green-dim:rgba(29,185,84,0.1); --green-border:rgba(29,185,84,0.3);
+  --amber:#e09b35; --amber-dim:rgba(224,155,53,0.1);
+  --red:#e04040; --gold:#c8a84b;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:'Heebo',sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;}
+
+body {
+  display:flex; flex-direction:column;
+  background: radial-gradient(ellipse at 15% 10%, rgba(45,114,200,0.13) 0%, transparent 48%),
+              radial-gradient(ellipse at 85% 88%, rgba(29,185,84,0.07) 0%, transparent 44%),
+              linear-gradient(160deg,#06090d 0%,#050810 100%);
+}
+
+/* TOPBAR */
+#topbar {
+  display:flex; align-items:center; gap:12px; padding:10px 14px;
+  background:rgba(6,9,13,0.70); backdrop-filter:blur(40px);
+  border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.tb-logo { width:55px; height:55px; object-fit:contain; filter: drop-shadow(0 0 10px var(--accent-glow)); }
+.tb-title-wrap { flex:1; }
+.tb-title { font-size:14px; font-weight:900; letter-spacing:-0.3px; }
+.tb-sub { font-size:10px; color:var(--muted); font-weight:600; }
+
+/* STATS STRIP */
+#statsStrip { display:flex; gap:6px; padding:6px 10px; overflow-x:auto; flex-shrink:0; }
+#statsStrip::-webkit-scrollbar { display:none; }
+.stat-cell {
+  flex:0 0 auto; min-width:95px; padding:8px 15px; border-radius:14px;
+  border:1px solid var(--border); background:rgba(255,255,255,0.04); text-align:center;
+  backdrop-filter:blur(20px);
+}
+.stat-num { font-size:24px; font-weight:900; color:var(--text); line-height:1; }
+.stat-lbl { font-size:9px; font-weight:700; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* PERSPECTIVE SWITCHER */
+.perspective-bar {
+    display: flex; background: var(--s2); margin: 0 14px 10px; border-radius: 12px; padding: 4px; border: 1px solid var(--border);
+}
+.persp-btn {
+    flex: 1; padding: 8px; text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); cursor: pointer; border-radius: 8px; transition: 0.2s;
+}
+.persp-btn.active { background: var(--accent); color: #fff; box-shadow: 0 4px 12px var(--accent-glow); }
+
+/* MAIN SCROLL AREA */
+#scrollArea { flex:1; overflow-y:auto; padding:0 14px 100px; }
+#scrollArea::-webkit-scrollbar { width:3px; }
+#scrollArea::-webkit-scrollbar-thumb { background:var(--s4); border-radius:2px; }
+
+/* WING CARDS (Operational Mode) */
+.wing-card {
+  background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:14px;
+  margin-bottom:8px; backdrop-filter:blur(20px); position:relative; overflow:hidden;
+}
+.wing-card.done { border-color:var(--green-border); background:var(--green-dim); }
+.wing-card.busy { border-color:rgba(224,155,53,0.4); }
+.wing-main { display:flex; align-items:center; padding:12px 14px; gap:10px; }
+.wing-name { flex:1; font-size:15px; font-weight:900; }
+.big-inp {
+  width:80px; background:rgba(255,255,255,0.06); border:1.5px solid var(--border);
+  border-radius:12px; padding:8px 5px; text-align:center; color:var(--text);
+  font-family:'Heebo'; font-size:24px; font-weight:900; outline:none; transition:0.2s;
+}
+.big-inp:focus { border-color:var(--accent); background:rgba(45,114,200,0.1); }
+.status-btn { width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); background:var(--s3); color:var(--muted); cursor:pointer; }
+.wing-card.done .status-btn { background:var(--green); color:#fff; border-color:var(--green); }
+
+/* BUSY SCAN ANIMATION */
+.scan-bar { position:absolute; bottom:0; left:0; right:0; height:2px; background:rgba(224,155,53,0.1); overflow:hidden; display:none; }
+.wing-card.busy .scan-bar { display:block; }
+.scan-fill { height:100%; width:30%; background:var(--amber); animation:scan 2s linear infinite; }
+@keyframes scan { from { transform:translateX(-100%); } to { transform:translateX(400%); } }
+
+/* MAP GRID (Command Mode) */
+.map-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:10px; }
+.map-cell {
+  background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:14px;
+  padding:15px 10px; text-align:center; backdrop-filter:blur(20px);
+}
+.map-cell.done { border-color:var(--green-border); box-shadow: 0 0 15px var(--green-dim); }
+.map-cell-name { font-size:12px; color:var(--muted); font-weight:700; margin-bottom:5px; }
+.map-cell-num { font-size:28px; font-weight:900; }
+
+/* PRESENCE PILLS */
+.pres-bar { display:flex; gap:6px; padding:5px 14px; overflow-x:auto; flex-shrink:0; }
+.pres-pill {
+  background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:20px;
+  padding:4px 10px; font-size:11px; font-weight:700; white-space:nowrap; display:flex; align-items:center; gap:5px;
+}
+.pres-dot { width:6px; height:6px; background:var(--green); border-radius:50%; box-shadow:0 0 5px var(--green); }
+
+/* OVERLAYS */
+.overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:500;
+  display:none; align-items:flex-end; backdrop-filter:blur(10px);
+}
+.overlay.open { display:flex; }
+.sheet {
+  background:linear-gradient(180deg, #121a2a 0%, #06090d 100%); width:100%;
+  border-radius:25px 25px 0 0; padding:20px; border-top:1px solid var(--border2);
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+}
+
+/* LOGIN */
+#loginScreen {
+  position:fixed; inset:0; background:var(--bg); z-index:1000;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;
+}
+.login-card {
+  width:100%; max-width:320px; background:rgba(255,255,255,0.05); padding:25px;
+  border-radius:20px; border:1px solid var(--border2); backdrop-filter:blur(30px);
+}
+
+/* NAV TAB BAR (Bottom) */
+.bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; background: rgba(11,16,24,0.9);
+    border-top: 1px solid var(--border); display: flex; padding: 10px 0; z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+.nav-item { flex: 1; text-align: center; color: var(--muted); cursor: pointer; }
+.nav-item.active { color: var(--accent); }
+.nav-item svg { display: block; margin: 0 auto 4px; }
+.nav-item span { font-size: 11px; font-weight: 700; }
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+    <div class="login-card">
+        <div style="text-align:center; margin-bottom:20px;">
+            <h2 class="app-title" style="font-size:24px;">אביבים</h2>
+            <p class="app-sub">מרכז סנכרון ופיקוד</p>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label style="font-size:11px; color:var(--muted); font-weight:800; display:block; margin-bottom:5px;">מספר אישי / שם</label>
+            <input type="text" id="userInput" placeholder="הכנס זיהוי..." style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--s3); color:#fff; outline:none;">
+        </div>
+        <button onclick="doLogin()" style="width:100%; padding:14px; border-radius:10px; background:var(--accent); color:#fff; font-weight:900; border:none; cursor:pointer; box-shadow: 0 4px 15px var(--accent-glow);">כניסה למערכת</button>
+    </div>
+</div>
+
+<!-- TOPBAR -->
+<div id="mainUI" style="display:none; flex-direction:column; height:100%;">
+    <div class="topbar">
+        <div class="logo-wrap">
+            <div id="appLogo" style="width:40px; height:40px; background:var(--accent); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff;">א</div>
+            <div class="tb-title-wrap">
+                <div class="tb-title">מרכז פיקוד וספירה</div>
+                <div class="tb-sub" id="countNameHeader">טוען נתונים...</div>
+            </div>
+        </div>
+        <div class="pulse-dot" id="liveDot"></div>
+    </div>
+
+    <!-- STATS STRIP -->
+    <div class="stats-strip">
+        <div class="stat-cell" style="border-right:3px solid var(--accent)">
+            <div class="stat-num" id="statPresent">0</div>
+            <div class="stat-lbl">במקום</div>
+        </div>
+        <div class="stat-cell" style="border-right:3px solid var(--amber)">
+            <div class="stat-num" id="statExits">0</div>
+            <div class="stat-lbl">יציאות</div>
+        </div>
+        <div class="stat-cell" style="border-right:3px solid var(--green)">
+            <div class="stat-num" id="statTotal">0</div>
+            <div class="stat-lbl">מצבה</div>
+        </div>
+    </div>
+
+    <!-- PERSPECTIVE -->
+    <div class="perspective-bar">
+        <div class="persp-btn active" id="btnCommand" onclick="setMode('command')">תצוגת מפקד</div>
+        <div class="persp-btn" id="btnOps" onclick="setMode('ops')">תצוגת סוהר</div>
+    </div>
+
+    <!-- PRESENCE -->
+    <div class="pres-bar" id="presBar"></div>
+
+    <!-- CONTENT -->
+    <div class="scroll-area" id="scrollArea"></div>
+
+    <!-- NAVIGATION BOTTOM -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('main')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>ראשי</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('log')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>לוג</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('archive')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+            <span>ארכיון</span>
+        </div>
+    </div>
+</div>
+
+<!-- CHAT OVERLAY -->
+<div class="overlay" id="chatOverlay" onclick="this.classList.remove('open')">
+    <div class="sheet" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0;">צ'אט סוהרים</h3>
+            <span onclick="document.getElementById('chatOverlay').classList.remove('open')" style="cursor:pointer; opacity:0.5;">✕</span>
+        </div>
+        <div id="chatMessages" style="height:300px; overflow-y:auto; margin-bottom:10px; display:flex; flex-direction:column; gap:8px;"></div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="chatInp" placeholder="הודעה..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--s2); color:#fff;">
+            <button onclick="sendChat()" style="padding:10px 20px; border-radius:10px; background:var(--accent); color:#fff; border:none; font-weight:800;">שלח</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ═══ DATA & CONFIG ═══ */
+const WINGS = [
+    {id:'w1', name:'אגף ורד'},
+    {id:'w2', name:'אגף חמנייה'},
+    {id:'w3', name:'אגף כלנית'},
+    {id:'w4', name:'אגף רקפת'},
+    {id:'w5', name:'אגף נרקיס'}
+];
+const GENERALS = ['ספרייה', 'חדר אוכל', 'מועדון', 'גינה', 'משרד ראשי'];
+
+/* ═══ FIREBASE INIT ═══ */
+firebase.initializeApp({
+    apiKey: "AIzaSyBSV1dq1NgIr92wLbDelT5K6LgsOL9NQVQ",
+    authDomain: "dekel-prisoner-count-fcc36.firebaseapp.com",
+    databaseURL: "https://dekel-prisoner-count-fcc36-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "dekel-prisoner-count-fcc36"
+});
+const db = firebase.database();
+
+/* ═══ STATE ═══ */
+let user = "";
+let mode = "command"; // command or ops
+let activeTab = "main";
+let D = { wings: {}, general: {}, winglocks: {}, presence: {}, log: [], chat: [] };
+
+/* ═══ AUTH ═══ */
+function doLogin() {
+    user = document.getElementById('userInput').value.trim();
+    if(!user) return;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainUI').style.display = 'flex';
+    document.getElementById('userNameDisplay').textContent = user;
+    
+    // Presence
+    const pkey = user.replace(/[.#$[\]]/g, '_');
+    db.ref('presence/' + pkey).set({ name: user, ts: Date.now() });
+    db.ref('presence/' + pkey).onDisconnect().remove();
+
+    initListeners();
+}
+
+function initListeners() {
+    db.ref('/').on('value', snap => {
+        const data = snap.val() || {};
+        D.wings = data.wings || {};
+        D.general = data.general || {};
+        D.winglocks = data.winglocks || {};
+        D.presence = data.presence || {};
+        D.log = data.log ? Object.values(data.log) : [];
+        D.chat = data.chat ? Object.values(data.chat) : [];
+        render();
+    });
+}
+
+/* ═══ NAVIGATION ═══ */
+function setMode(newMode) {
+    mode = newMode;
+    document.getElementById('btnCommand').classList.toggle('active', mode === 'command');
+    document.getElementById('btnOps').classList.toggle('active', mode === 'ops');
+    render();
+}
+
+function switchTab(tab) {
+    activeTab = tab;
+    const items = document.querySelectorAll('.nav-item');
+    items.forEach((item, idx) => {
+        item.classList.toggle('active', ['main', 'log', 'archive'][idx] === tab);
+    });
+    render();
+}
+
+/* ═══ RENDERING ═══ */
+function render() {
+    const area = document.getElementById('scrollArea');
+    updateStats();
+    renderPresence();
+
+    if (activeTab === 'log') {
+        renderLog(area);
+        return;
+    }
+
+    if (mode === 'command') renderCommandView(area);
+    else renderOpsView(area);
+}
+
+function renderPresence() {
+    const bar = document.getElementById('presBar');
+    const users = Object.values(D.presence);
+    bar.innerHTML = users.map(u => `<div class="pres-pill"><div class="pres-dot"></div>${u.name}</div>`).join('');
+}
+
+function renderCommandView(container) {
+    let html = '<div class="map-grid">';
+    WINGS.forEach(w => {
+        const wd = D.wings[w.id] || { total: 0, done: false };
+        const locked = D.winglocks[w.id];
+        const isBusy = locked && locked !== user;
+        html += `
+            <div class="map-cell ${wd.done ? 'done' : ''}">
+                <div class="map-cell-name">${w.name}</div>
+                <div class="map-cell-num">${wd.total || 0}</div>
+                ${isBusy ? `<div style="font-size:9px; color:var(--amber); margin-top:5px;">בספירה: ${locked}</div>` : ''}
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    html += '<div class="sh" style="margin:20px 0 10px; font-size:12px; color:var(--dim); font-weight:800;">מקומות ציבוריים</div>';
+    html += '<div class="map-grid">';
+    GENERALS.forEach(g => {
+        const val = D.general[g] || 0;
+        html += `
+            <div class="map-cell">
+                <div class="map-cell-name">${g}</div>
+                <div class="map-cell-num">${val}</div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderOpsView(container) {
+    let html = '';
+    WINGS.forEach(w => {
+        const wd = D.wings[w.id] || { total: 0, done: false };
+        const locked = D.winglocks[w.id];
+        const isLockedByOther = locked && locked !== user;
+        
+        html += `
+            <div class="wing-card ${wd.done ? 'done' : ''} ${isLockedByOther ? 'busy' : ''}">
+                <div class="scan-bar"><div class="scan-fill"></div></div>
+                <div class="wing-main">
+                    <div class="wing-info">
+                        <div class="wing-name">${w.name}</div>
+                        ${isLockedByOther ? `<div style="font-size:10px; color:var(--amber);">נעול ע"י ${locked}</div>` : ''}
+                    </div>
+                    <div class="wing-right">
+                        <input type="number" class="big-inp" value="${wd.total || ''}" 
+                               ${isLockedByOther ? 'disabled' : ''}
+                               onfocus="lockWing('${w.id}')"
+                               onblur="updateWing('${w.id}', this.value)"
+                               placeholder="0">
+                        <button onclick="toggleDone('${w.id}')" class="status-btn">${wd.done ? '✓' : '○'}</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '<div class="sh" style="margin:15px 0 10px; font-size:12px; color:var(--dim);">מקומות ציבוריים</div>';
+    GENERALS.forEach(g => {
+        const val = D.general[g] || 0;
+        html += `
+            <div class="wing-card">
+                <div class="wing-main">
+                    <div class="wing-name">${g}</div>
+                    <input type="number" class="big-inp" value="${val || ''}" 
+                           onblur="updateGen('${g}', this.value)" placeholder="0">
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function renderLog(container) {
+    const logs = [...D.log].reverse();
+    container.innerHTML = logs.map(l => `
+        <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px;">
+            <span style="color:var(--accent); font-weight:800;">${l.user}:</span> ${l.text}
+            <div style="font-size:10px; color:var(--dim);">${l.time}</div>
+        </div>
+    `).join('');
+}
+
+/* ═══ LOGIC ═══ */
+function lockWing(id) {
+    db.ref('winglocks/' + id).set(user);
+}
+
+function updateWing(id, val) {
+    db.ref('wings/' + id).update({ total: parseInt(val) || 0 });
+    db.ref('winglocks/' + id).remove();
+    addLog(`עדכן אגף ${id} ל-${val}`);
+}
+
+function updateGen(id, val) {
+    db.ref('general/' + id).set(parseInt(val) || 0);
+}
+
+function toggleDone(id) {
+    const cur = D.wings[id] ? D.wings[id].done : false;
+    db.ref('wings/' + id).update({ done: !cur });
+}
+
+function updateStats() {
+    let present = 0;
+    WINGS.forEach(w => present += (D.wings[w.id]?.total || 0));
+    GENERALS.forEach(g => present += (D.general[g] || 0));
+    document.getElementById('statPresent').textContent = present;
+    document.getElementById('statTotal').textContent = present; // וכו'
+}
+
+function addLog(txt) {
+    db.ref('log').push({ user: user, text: txt, time: new Date().toLocaleTimeString() });
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('light');
+}
+
+function openChat() {
+    document.getElementById('chatOverlay').classList.add('open');
+    renderChat();
+}
+
+function renderChat() {
+    const cont = document.getElementById('chatMessages');
+    cont.innerHTML = D.chat.map(m => `
+        <div style="background:var(--s3); padding:8px; border-radius:10px; align-self:${m.user === user ? 'flex-start' : 'flex-end'}">
+            <div style="font-size:10px; color:var(--accent);">${m.user}</div>
+            <div>${m.text}</div>
+        </div>
+    `).join('');
+    cont.scrollTop = cont.scrollHeight;
+}
+
+function sendChat() {
+    const inp = document.getElementById('chatInp');
+    if(!inp.value) return;
+    db.ref('chat').push({ user: user, text: inp.value, ts: Date.now() });
+    inp.value = "";
+}
+
+</script>
+</body>
+</html>
