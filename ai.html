@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0A1628">
+<title>ספירת אסירים — כניסה</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0A1628;
+    --s1:#111E32;
+    --s2:#162240;
+    --accent:#2563EB;
+    --accent-d:#1D4ED8;
+    --green:#22c55e;
+    --amber:#f59e0b;
+    --red:#ef4444;
+    --text:#F1F5F9;
+    --mid:#94A3B8;
+    --dim:#475569;
+    --border:rgba(255,255,255,0.08);
+    --radius:16px;
+  }
+
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Arial,sans-serif;direction:rtl;}
+
+  /* ── layout ── */
+  .page{
+    min-height:100vh;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:24px 20px;
+    gap:0;
+  }
+
+  /* ── logo area ── */
+  .logo-area{
+    display:flex;flex-direction:column;align-items:center;
+    margin-bottom:32px;
+  }
+  .emblem{
+    width:72px;height:72px;border-radius:50%;
+    background:linear-gradient(135deg,var(--s2),var(--s1));
+    border:1.5px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:14px;
+    box-shadow:0 4px 24px rgba(0,0,0,.4);
+  }
+  .emblem svg{width:38px;height:38px;color:var(--accent);}
+  .logo-title{font-size:20px;font-weight:800;color:var(--text);text-align:center;}
+  .logo-sub{font-size:13px;color:var(--mid);margin-top:4px;text-align:center;}
+
+  /* ── card ── */
+  .card{
+    width:100%;max-width:360px;
+    background:var(--s1);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:28px 24px 24px;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+  }
+  .card-title{font-size:15px;font-weight:700;color:var(--text);text-align:center;margin-bottom:20px;}
+
+  /* ── display ── */
+  .display-wrap{
+    background:var(--bg);
+    border:1.5px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+    margin-bottom:18px;
+    min-height:56px;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:8px;
+  }
+  .display-val{
+    font-size:28px;font-weight:900;letter-spacing:4px;
+    color:var(--text);font-variant-numeric:tabular-nums;
+    flex:1;text-align:center;
+    transition:color .15s;
+  }
+  .display-val.typed{color:var(--accent);}
+  .display-val.error{color:var(--red);animation:shake .3s ease;}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .display-clear{
+    width:36px;height:36px;border-radius:50%;border:none;
+    background:rgba(239,68,68,.1);color:var(--red);
+    font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:background .15s;flex-shrink:0;
+    opacity:0;pointer-events:none;transition:opacity .15s;
+  }
+  .display-clear.visible{opacity:1;pointer-events:all;}
+  .display-clear:active{background:rgba(239,68,68,.25);}
+
+  /* ── numpad ── */
+  .numpad{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .key{
+    aspect-ratio:1;
+    background:var(--s2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    color:var(--text);
+    font-size:22px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    user-select:none;
+    transition:background .1s,transform .1s,border-color .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .key:active,.key.pressed{background:var(--accent);border-color:var(--accent);transform:scale(.94);}
+  .key.del{font-size:18px;color:var(--mid);}
+  .key.del:active,.key.del.pressed{background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);color:var(--red);}
+  .key.zero{grid-column:2;}
+
+  /* ── enter btn ── */
+  .enter-btn{
+    width:100%;padding:15px;
+    background:var(--accent);
+    border:none;border-radius:12px;
+    color:#fff;font-size:16px;font-weight:800;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:background .15s,transform .1s;
+    font-family:inherit;
+  }
+  .enter-btn:active{transform:scale(.98);background:var(--accent-d);}
+  .enter-btn:disabled{opacity:.4;pointer-events:none;}
+
+  /* ── status / error ── */
+  .status-row{
+    min-height:28px;
+    display:flex;align-items:center;justify-content:center;
+    margin-top:14px;
+    font-size:13px;font-weight:600;
+  }
+  .status-row.err{color:var(--red);}
+  .status-row.ok {color:var(--green);}
+  .status-row.loading{color:var(--mid);}
+
+  /* ── spinner ── */
+  .spinner{
+    width:18px;height:18px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.2);
+    border-top-color:#fff;
+    animation:spin .7s linear infinite;
+    display:none;
+  }
+  .spinner.active{display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── routing overlay ── */
+  .routing-overlay{
+    position:fixed;inset:0;
+    background:var(--bg);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:16px;
+    z-index:100;
+    opacity:0;pointer-events:none;
+    transition:opacity .3s;
+  }
+  .routing-overlay.show{opacity:1;pointer-events:all;}
+  .routing-name{font-size:20px;font-weight:800;color:var(--text);}
+  .routing-role{font-size:13px;color:var(--mid);}
+  .routing-spinner{
+    width:40px;height:40px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.1);
+    border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+
+  /* ── footer ── */
+  .footer{margin-top:28px;font-size:11px;color:var(--dim);text-align:center;}
+
+  /* ── role cards (shown after name resolved) ── */
+  .role-cards{
+    display:none;
+    flex-direction:column;gap:10px;
+    width:100%;max-width:360px;
+    margin-top:16px;
+  }
+  .role-cards.show{display:flex;}
+  .role-card{
+    background:var(--s1);
+    border:1.5px solid var(--border);
+    border-radius:12px;
+    padding:14px 18px;
+    display:flex;align-items:center;gap:14px;
+    cursor:pointer;
+    transition:border-color .15s,background .15s;
+    text-decoration:none;
+    color:var(--text);
+  }
+  .role-card:hover,.role-card:active{border-color:var(--accent);background:rgba(37,99,235,.08);}
+  .role-icon{
+    width:44px;height:44px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;flex-shrink:0;
+  }
+  .role-icon.blue{background:rgba(37,99,235,.15);}
+  .role-icon.amber{background:rgba(245,158,11,.12);}
+  .role-info{flex:1;}
+  .role-title{font-size:14px;font-weight:700;color:var(--text);}
+  .role-desc{font-size:12px;color:var(--mid);margin-top:2px;}
+  .role-arrow{color:var(--dim);font-size:18px;}
+</style>
+</head>
+<body>
+
+<div class="page" id="loginPage">
+
+  <div class="logo-area">
+    <div class="emblem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    </div>
+    <div class="logo-title">ספירת אסירים</div>
+    <div class="logo-sub">בית הסוהר אביבים</div>
+  </div>
+
+  <div class="card" id="loginCard">
+    <div class="card-title">הזן מספר אישי</div>
+
+    <div class="display-wrap">
+      <div class="display-val" id="dispVal">——————</div>
+      <button class="display-clear" id="clearBtn" onclick="clearAll()">✕</button>
+    </div>
+
+    <div class="numpad" id="numpad">
+      <div class="key" data-n="1">1</div>
+      <div class="key" data-n="2">2</div>
+      <div class="key" data-n="3">3</div>
+      <div class="key" data-n="4">4</div>
+      <div class="key" data-n="5">5</div>
+      <div class="key" data-n="6">6</div>
+      <div class="key" data-n="7">7</div>
+      <div class="key" data-n="8">8</div>
+      <div class="key" data-n="9">9</div>
+      <div class="key del" data-del>⌫</div>
+      <div class="key zero" data-n="0">0</div>
+    </div>
+
+    <button class="enter-btn" id="enterBtn" onclick="doLogin()" disabled>
+      <div class="spinner" id="spinner"></div>
+      <span id="enterLabel">כניסה</span>
+    </button>
+
+    <div class="status-row" id="statusRow"></div>
+  </div>
+
+  <!-- Role selector — shown after ID verified -->
+  <div class="role-cards" id="roleCards">
+    <div class="role-card" id="countingCard" onclick="goTo('test.html')">
+      <div class="role-icon blue">📋</div>
+      <div class="role-info">
+        <div class="role-title">ספירה</div>
+        <div class="role-desc">הקלדת ספירה מהשטח</div>
+      </div>
+      <div class="role-arrow">←</div>
+    </div>
+    <div class="role-card" id="dashboardCard" onclick="goTo('viewer.html')">
+      <div class="role-icon amber">📊</div>
+      <div class="role-info">
+        <div class="role-title">דשבורד מפקד</div>
+        <div class="role-desc">מעקב בזמן אמת + פריקה</div>
+      </div>
+      <div class="role-arrow">←</div>
+    </div>
+  </div>
+
+  <div class="footer">גרסה 2.0 · אביבים</div>
+</div>
+
+<!-- Routing overlay -->
+<div class="routing-overlay" id="routingOverlay">
+  <div class="routing-spinner"></div>
+  <div class="routing-name" id="routingName"></div>
+  <div class="routing-role" id="routingRole">מעביר לאפליקציה...</div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBSV1dq1NgIr92wLbDelT5K6LgsOL9NQVQ",
+  authDomain:"dekel-prisoner-count-fcc36.firebaseapp.com",
+  databaseURL:"https://dekel-prisoner-count-fcc36-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"dekel-prisoner-count-fcc36"
+});
+const db = firebase.database();
+
+// ── State ──────────────────────────────
+const ADMIN_ID = '999999';
+let input = '';
+let resolvedName = '';
+let officersMap = {};
+let adminPin = ADMIN_ID;
+
+// ── Load officers from Firebase ────────
+async function loadOfficers() {
+  try {
+    const snap = await db.ref('officers').get();
+    if (snap.exists()) officersMap = snap.val() || {};
+  } catch(e) { officersMap = {}; }
+  try {
+    const snap = await db.ref('adminPin').get();
+    if (snap.exists()) adminPin = snap.val();
+  } catch(e) {}
+  // Ensure default admin
+  if (!officersMap[ADMIN_ID]) officersMap[ADMIN_ID] = 'מנהל מערכת';
+}
+loadOfficers();
+
+// ── Numpad ─────────────────────────────
+document.getElementById('numpad').addEventListener('click', e => {
+  const key = e.target.closest('.key');
+  if (!key) return;
+  // visual press
+  key.classList.add('pressed');
+  setTimeout(() => key.classList.remove('pressed'), 120);
+
+  if (key.dataset.del !== undefined) {
+    delDigit();
+  } else if (key.dataset.n !== undefined) {
+    addDigit(key.dataset.n);
+  }
+});
+
+function addDigit(d) {
+  if (input.length >= 6) return;
+  input += d;
+  updateDisplay();
+}
+function delDigit() {
+  if (!input.length) return;
+  input = input.slice(0, -1);
+  updateDisplay();
+}
+function clearAll() {
+  input = '';
+  updateDisplay();
+  setStatus('');
+  hideRoleCards();
+}
+
+function updateDisplay() {
+  const disp = document.getElementById('dispVal');
+  const clearBtn = document.getElementById('clearBtn');
+  const enterBtn = document.getElementById('enterBtn');
+
+  if (!input.length) {
+    disp.textContent = '——————';
+    disp.className = 'display-val';
+  } else {
+    const padded = input.padEnd(6, '·');
+    disp.textContent = padded.split('').join(' ');
+    disp.className = 'display-val typed';
+  }
+
+  clearBtn.classList.toggle('visible', input.length > 0);
+  enterBtn.disabled = input.length < 6;
+
+  // Auto-login when 6 digits entered
+  if (input.length === 6) {
+    setTimeout(doLogin, 120);
+  }
+}
+
+// ── Login ──────────────────────────────
+async function doLogin() {
+  if (input.length < 6) return;
+  const id = input;
+
+  setLoading(true);
+  setStatus('');
+  hideRoleCards();
+
+  // Refresh officers in case new ones added
+  await loadOfficers();
+
+  const name = officersMap[id] || null;
+
+  setLoading(false);
+
+  if (!name) {
+    flashError();
+    setStatus('מספר אישי לא מוכר — פנה למנהל', 'err');
+    return;
+  }
+
+  resolvedName = name;
+
+  // Save to sessionStorage so target app can pick it up
+  sessionStorage.setItem('aviviim_operator', name);
+  sessionStorage.setItem('aviviim_id', id);
+
+  // Admin gets both options; others go straight to counting
+  if (id === ADMIN_ID || id === adminPin) {
+    showRoleCards(name, true);
+  } else {
+    // Check if this person has commander role (future: role field in officersMap)
+    showRoleCards(name, false);
+  }
+}
+
+function showRoleCards(name, isAdmin) {
+  setStatus(`ברוך הבא, ${name}`, 'ok');
+  const cards = document.getElementById('roleCards');
+  const dashCard = document.getElementById('dashboardCard');
+
+  // Only admin sees dashboard option
+  if (!isAdmin) {
+    dashCard.style.display = 'none';
+    // Non-admin: go straight
+    setTimeout(() => goTo('test.html'), 300);
+    return;
+  }
+
+  cards.classList.add('show');
+}
+
+function hideRoleCards() {
+  document.getElementById('roleCards').classList.remove('show');
+  document.getElementById('dashboardCard').style.display = '';
+}
+
+function goTo(page) {
+  const overlay = document.getElementById('routingOverlay');
+  document.getElementById('routingName').textContent = resolvedName;
+  document.getElementById('routingRole').textContent = page === 'viewer.html' ? 'דשבורד מפקד' : 'אפליקציית ספירה';
+  overlay.classList.add('show');
+  setTimeout(() => { window.location.href = page; }, 600);
+}
+
+// ── UI helpers ─────────────────────────
+function setLoading(on) {
+  document.getElementById('spinner').classList.toggle('active', on);
+  document.getElementById('enterLabel').style.display = on ? 'none' : '';
+  document.getElementById('enterBtn').disabled = on;
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('statusRow');
+  el.textContent = msg;
+  el.className = 'status-row' + (type ? ` ${type}` : '');
+}
+
+function flashError() {
+  const disp = document.getElementById('dispVal');
+  disp.className = 'display-val error';
+  input = '';
+  setTimeout(() => {
+    disp.textContent = '——————';
+    disp.className = 'display-val';
+    document.getElementById('clearBtn').classList.remove('visible');
+    document.getElementById('enterBtn').disabled = true;
+  }, 600);
+}
+
+// ── Keyboard support ───────────────────
+document.addEventListener('keydown', e => {
+  if (e.key >= '0' && e.key <= '9') addDigit(e.key);
+  else if (e.key === 'Backspace') delDigit();
+  else if (e.key === 'Enter' && input.length === 6) doLogin();
+});
+</script>
+</body>
+</html>
