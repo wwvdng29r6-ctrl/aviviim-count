@@ -149,12 +149,22 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:-apple
 firebase.initializeApp({apiKey:"AIzaSyBSV1dq1NgIr92wLbDelT5K6LgsOL9NQVQ",authDomain:"dekel-prisoner-count-fcc36.firebaseapp.com",databaseURL:"https://dekel-prisoner-count-fcc36-default-rtdb.europe-west1.firebasedatabase.app",projectId:"dekel-prisoner-count-fcc36"});
 const db=firebase.database();
 const ADMIN='999999';
-let pin='',name='',officers={},adminPin=ADMIN;
+let pin='',name='',officers={},adminPin=ADMIN,loaded=false;
+
+// timeout helper
+function fbGet(ref,ms=4000){
+  return Promise.race([
+    db.ref(ref).get(),
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))
+  ]);
+}
 
 async function load(){
-  try{const s=await db.ref('officers').get();if(s.exists())officers=s.val()||{};}catch(e){}
-  try{const s=await db.ref('adminPin').get();if(s.exists())adminPin=s.val();}catch(e){}
+  if(loaded)return;
+  try{const s=await fbGet('officers');if(s&&s.exists())officers=s.val()||{};}catch(e){}
+  try{const s=await fbGet('adminPin');if(s&&s.exists())adminPin=s.val();}catch(e){}
   if(!officers[ADMIN])officers[ADMIN]='מנהל מערכת';
+  loaded=true;
 }
 load();
 
@@ -181,22 +191,37 @@ function rend(){
   if(full)setTimeout(doLogin,140);
 }
 
+let loginRunning=false;
 async function doLogin(){
-  if(pin.length<6)return;
+  if(pin.length<6||loginRunning)return;
+  loginRunning=true;
   const id=pin;
   setLoad(true);st('');hideR();
-  await load();
-  setLoad(false);
-  const n=officers[id]||null;
-  if(!n){flashErr();st('מספר אישי לא מוכר — פנה למנהל','err');return;}
-  name=n;
 
-  // ── מפתח שtest.html קורא ──
+  // ── Admin: בדוק מקומית קודם, ואז Firebase ──
+  const isKnownAdmin=(id===ADMIN);
+
+  // load עם timeout — אם נכשל ממשיכים עם fallback
+  try{ await load(); }catch(e){}
+
+  setLoad(false);
+
+  // fallback: אם Firebase לא הגיב ו-id=999999 — תן גישה
+  const n = officers[id] || (isKnownAdmin ? 'מנהל מערכת' : null);
+
+  if(!n){
+    loginRunning=false;
+    flashErr();
+    st('מספר אישי לא מוכר — פנה למנהל','err');
+    return;
+  }
+  name=n;
   sessionStorage.setItem('dakel_operator',n);
 
   if(id===ADMIN||id===adminPin){
     st('ברוך הבא, '+n,'ok');
     showR();
+    loginRunning=false;
   } else {
     goTo('test.html');
   }
