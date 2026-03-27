@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zara">
+<meta name="theme-color" content="#06090d">
+<title>Zara Quick Cart</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06090d;--s1:#0b1018;--s2:#101620;--s3:#161e2a;--s4:#1d2635;
+  --border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.10);
+  --text:#dde6f0;--muted:#8aa4bf;--dim:#5a7a96;
+  --accent:#2d72c8;--accent-glow:rgba(45,114,200,0.18);
+  --green:#1db954;--green-dim:rgba(29,185,84,0.10);--green-border:rgba(29,185,84,0.28);
+  --red:#e04040;--red-dim:rgba(224,64,64,0.10);
+  --r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:28px;
+}
+body.light{
+  --bg:#e4edf8;--s1:rgba(255,255,255,0.82);--s2:rgba(255,255,255,0.70);
+  --s3:rgba(255,255,255,0.55);--s4:rgba(255,255,255,0.40);
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.12);
+  --text:#0d1724;--muted:#4a6580;--dim:#7a9ab8;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  height:100dvh;overflow:hidden;font-family:'Heebo',sans-serif;
+  background:radial-gradient(ellipse at 15% 10%,rgba(45,114,200,0.13) 0%,transparent 48%),
+    radial-gradient(ellipse at 85% 88%,rgba(29,185,84,0.07) 0%,transparent 44%),
+    linear-gradient(160deg,#06090d 0%,#07091280 50%,#050810 100%);
+  background-attachment:fixed;color:var(--text);direction:rtl;
+}
+body.light{
+  background:radial-gradient(ellipse at 15% 10%,rgba(45,114,200,0.10) 0%,transparent 48%),
+    linear-gradient(160deg,#e4edf8 0%,#d8e6f4 50%,#e4edf8 100%);
+  background-attachment:fixed;
+}
+.app{display:flex;flex-direction:column;height:100dvh;max-width:500px;margin:0 auto}
+.hdr{padding:max(12px,env(safe-area-inset-top)) 20px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-size:15px;font-weight:700;letter-spacing:3px;text-transform:uppercase}
+.logo span{color:var(--accent)}
+.icon-btn{width:36px;height:36px;border-radius:50%;background:var(--s3);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.icon-btn:active{transform:scale(0.92)}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 16px}
+.scan-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r-xl);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:20px;margin-bottom:12px}
+.scan-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.scan-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 12px;border-radius:var(--r-lg);border:1.5px dashed var(--border2);background:var(--s3);color:var(--muted);cursor:pointer;position:relative;min-height:44px;transition:all 0.15s}
+.scan-btn:active{transform:scale(0.97);background:var(--s4)}
+.scan-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.scan-btn svg{opacity:0.45}
+.scan-btn span{font-size:12px;font-weight:600}
+.manual-row{display:flex;gap:8px}
+.manual-input{flex:1;padding:12px 14px;background:var(--s3);border:1px solid var(--border2);border-radius:var(--r-md);color:var(--text);font-family:'SF Mono','Fira Code','Courier New',monospace;font-size:15px;direction:ltr;text-align:left}
+.manual-input::placeholder{color:var(--dim);font-size:13px}
+.manual-input:focus{outline:none;border-color:var(--accent)}
+.add-btn{padding:12px 18px;background:var(--accent);border:none;border-radius:var(--r-md);color:#fff;font-size:18px;font-weight:700;cursor:pointer;min-height:44px;min-width:44px}
+.add-btn:active{transform:scale(0.95)}
+.ocr-status{margin-top:10px;padding:10px 14px;background:var(--s3);border-radius:var(--r-md);display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.ocr-status.active{display:flex}
+.ocr-prog{flex:1;height:3px;border-radius:2px;background:var(--s4);overflow:hidden}
+.ocr-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--green));transition:width 0.3s}
+.list-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r-xl);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);overflow:hidden}
+.list-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.list-title{font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--dim)}
+.list-count{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.clear-all{font-size:11px;color:var(--red);background:none;border:none;cursor:pointer;font-family:'Heebo',sans-serif;font-weight:600}
+.product-row{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.product-row:last-child{border-bottom:none}
+.p-icon{width:40px;height:40px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--accent-glow);color:var(--accent);font-size:11px;font-weight:700;font-family:monospace}
+.p-info{flex:1;min-width:0}
+.p-ref{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate;display:inline-block}
+.p-sub{font-size:11px;color:var(--dim);margin-top:1px}
+.p-actions{display:flex;gap:6px;flex-shrink:0}
+.p-open{height:40px;padding:0 14px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);text-decoration:none;font-size:12px;font-weight:700;font-family:'Heebo',sans-serif}
+.p-open:active{transform:scale(0.95)}
+.p-remove{width:40px;height:40px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;background:var(--red-dim);border:1px solid rgba(224,64,64,0.15);color:var(--red);cursor:pointer}
+.p-remove:active{transform:scale(0.92)}
+.empty{padding:50px 20px;text-align:center;color:var(--dim);font-size:13px;line-height:1.8}
+.empty svg{margin-bottom:10px;opacity:0.2}
+.bottom{padding:12px 16px max(12px,env(safe-area-inset-bottom));flex-shrink:0}
+.open-all{width:100%;padding:15px 20px;background:linear-gradient(135deg,var(--green),#17a348);border:none;border-radius:var(--r-lg);color:#fff;font-size:15px;font-weight:700;font-family:'Heebo',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;box-shadow:0 4px 20px rgba(29,185,84,0.3);transition:transform 0.15s}
+.open-all:active{transform:scale(0.97)}
+.open-all:disabled{opacity:0.3;cursor:not-allowed;transform:none}
+.open-sub{text-align:center;font-size:10px;color:var(--dim);margin-top:5px}
+.toast-w{position:fixed;top:max(16px,env(safe-area-inset-top));left:50%;transform:translateX(-50%) translateY(-120px);z-index:200;transition:transform 0.35s cubic-bezier(0.22,1,0.36,1)}
+.toast-w.show{transform:translateX(-50%) translateY(0)}
+.toast-m{background:var(--s3);border:1px solid var(--border2);border-radius:var(--r-md);padding:10px 20px;font-size:13px;font-weight:500;white-space:nowrap;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div class="logo">ZARA <span>SCAN</span></div>
+    <button class="icon-btn" id="themeBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+  </div>
+  <div class="content">
+    <div class="scan-card">
+      <div class="scan-btns">
+        <label class="scan-btn">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span>camera</span>
+          <input type="file" accept="image/*" capture="environment" id="camIn">
+        </label>
+        <label class="scan-btn">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <span>gallery</span>
+          <input type="file" accept="image/*" multiple id="galIn">
+        </label>
+      </div>
+      <div class="manual-row">
+        <input class="manual-input" id="skuIn" type="text" inputmode="numeric" placeholder="1234/567" autocomplete="off" autocorrect="off" autocapitalize="off">
+        <button class="add-btn" id="addBtn">+</button>
+      </div>
+      <div class="ocr-status" id="ocrStatus">
+        <div class="spinner"></div>
+        <span id="ocrText">scanning...</span>
+        <div class="ocr-prog"><div class="ocr-fill" id="ocrFill"></div></div>
+      </div>
+    </div>
+    <div id="listWrap"></div>
+  </div>
+  <div class="bottom">
+    <button class="open-all" id="openAll" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+      <span id="openAllText">open all in Zara</span>
+    </button>
+    <div class="open-sub">each product opens in Zara -- just tap "add to bag"</div>
+  </div>
+</div>
+<div class="toast-w" id="tw"><div class="toast-m" id="tm"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const ZARA='https://www.zara.com/gr/en';
+let skus=[];
+let ocrWorker=null;
+const $=id=>document.getElementById(id);
+
+function extractSKUs(t){
+  const f=new Set(),c=t.replace(/[oO]/g,'0').replace(/[lI|]/g,'1');
+  [/(\d{4,5}[\s\/\-\.]\d{3}[\s\/\-\.]\d{3})/g,/(\d{4,5}[\s\/\-\.]\d{3})/g].forEach(p=>{
+    p.lastIndex=0;let m;while(m=p.exec(c)){let s=m[1].replace(/[\s\-\.]/g,'/').replace(/\/+/g,'/');
+    if(s.split('/').length>=2&&s.split('/')[0].length>=4)f.add(s)}
+  });
+  (c.match(/\b\d{7,11}\b/g)||[]).forEach(n=>{
+    if(n.length===7)f.add(n.slice(0,4)+'/'+n.slice(4));
+    else if(n.length>=10)f.add(n.slice(0,4)+'/'+n.slice(4,7)+'/'+n.slice(7));
+  });
+  return[...f];
+}
+
+async function doOCR(d){
+  $('ocrStatus').classList.add('active');$('ocrText').textContent='loading...';$('ocrFill').style.width='5%';
+  try{
+    if(!ocrWorker){
+      ocrWorker=await Tesseract.createWorker('eng',1,{logger:i=>{
+        if(i.status==='recognizing text'){$('ocrFill').style.width=Math.round(i.progress*100)+'%';$('ocrText').textContent='scanning... '+Math.round(i.progress*100)+'%'}
+      }});
+      await ocrWorker.setParameters({tessedit_char_whitelist:'0123456789/ -.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'});
+    }
+    $('ocrText').textContent='scanning...';
+    const r=await ocrWorker.recognize(d),found=extractSKUs(r.data.text);
+    let a=0;found.forEach(ref=>{if(!skus.find(s=>s.ref===ref)){skus.push({ref,source:'ocr'});a++}});
+    $('ocrFill').style.width='100%';toast(a>0?a+' found':'no SKUs detected');render();
+  }catch(e){toast('OCR error')}
+  setTimeout(()=>{$('ocrStatus').classList.remove('active');$('ocrFill').style.width='0%'},1500);
+}
+
+function handleFiles(f){[...f].forEach(f=>{if(!f.type.startsWith('image/'))return;const r=new FileReader();r.onload=e=>doOCR(e.target.result);r.readAsDataURL(f)})}
+$('camIn').onchange=e=>{handleFiles(e.target.files);e.target.value=''};
+$('galIn').onchange=e=>{handleFiles(e.target.files);e.target.value=''};
+
+function addManual(){
+  const v=$('skuIn').value.trim();if(!v)return;
+  v.split(/[\n,;]+/).map(l=>l.replace(/\s+/g,'').trim()).filter(l=>l).forEach(ref=>{
+    if(!skus.find(s=>s.ref===ref))skus.push({ref,source:'manual'})
+  });
+  $('skuIn').value='';toast('added');render();
+}
+$('addBtn').onclick=addManual;
+$('skuIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addManual()}};
+
+function zaraUrl(ref){return ZARA+'/search?searchTerm='+encodeURIComponent(ref.replace(/\//g,' '))}
+
+function render(){
+  save();
+  $('openAll').disabled=skus.length===0;
+  $('openAllText').textContent=skus.length>0?'open all in Zara ('+skus.length+')':'open all in Zara';
+  if(!skus.length){$('listWrap').innerHTML='<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><br>camera / gallery / type SKU</div>';return}
+  let h='<div class="list-card"><div class="list-header"><span class="list-title">items</span><div style="display:flex;align-items:center;gap:12px"><span class="list-count">'+skus.length+'</span><button class="clear-all" id="clearAll">clear</button></div></div>';
+  skus.forEach((s,i)=>{
+    h+='<div class="product-row"><div class="p-icon">'+s.ref.split('/')[0].slice(-3)+'</div><div class="p-info"><div class="p-ref">'+s.ref+'</div><div class="p-sub">'+(s.source==='ocr'?'OCR':'manual')+'</div></div><div class="p-actions"><a class="p-open" href="'+zaraUrl(s.ref)+'" target="_blank">open</a><button class="p-remove" data-i="'+i+'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>';
+  });
+  h+='</div>';$('listWrap').innerHTML=h;
+  $('listWrap').querySelectorAll('.p-remove').forEach(b=>{b.onclick=()=>{skus.splice(+b.dataset.i,1);render()}});
+  const c=document.getElementById('clearAll');if(c)c.onclick=()=>{skus=[];render()};
+}
+
+$('openAll').onclick=()=>{
+  if(!skus.length)return;
+  window.open(zaraUrl(skus[0].ref),'_blank');
+  skus.slice(1).forEach((s,i)=>{setTimeout(()=>window.open(zaraUrl(s.ref),'_blank'),(i+1)*700)});
+  toast(skus.length+' tabs opening');
+};
+
+$('themeBtn').onclick=()=>{document.body.classList.toggle('light');localStorage.setItem('zs-theme',document.body.classList.contains('light')?'light':'dark')};
+if(localStorage.getItem('zs-theme')==='light')document.body.classList.add('light');
+
+function save(){try{localStorage.setItem('zs-skus',JSON.stringify(skus))}catch(e){}}
+function load(){try{const s=localStorage.getItem('zs-skus');if(s)skus=JSON.parse(s)}catch(e){}}
+
+let tt;function toast(m){clearTimeout(tt);$('tm').textContent=m;$('tw').classList.add('show');tt=setTimeout(()=>$('tw').classList.remove('show'),2200)}
+
+load();render();
+</script>
+</body>
+</html>
