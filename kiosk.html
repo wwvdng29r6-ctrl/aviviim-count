@@ -313,6 +313,35 @@ body::before{
 .k-no-count-txt{font-size:18px;font-weight:700;color:var(--muted);}
 .k-no-count-sub{font-size:14px;color:var(--dim);}
 
+/* ═══ AUTO-ROTATE HIGHLIGHT ═══ */
+.k-wing.rotate-highlight{
+  border-color:var(--blue) !important;
+  box-shadow:0 0 20px rgba(29,78,216,0.2), 0 4px 16px rgba(29,78,216,0.12) !important;
+  transform:scale(1.03);
+  transition:all .4s cubic-bezier(.4,0,.2,1);
+  z-index:2;
+}
+.k-wing{
+  transition:transform .4s cubic-bezier(.4,0,.2,1), border-color .3s, background .3s, box-shadow .4s;
+}
+.k-rotate-ctrl{
+  display:flex;align-items:center;gap:8px;
+  font-size:clamp(10px,1vw,13px);font-weight:700;color:var(--muted);
+  cursor:pointer;user-select:none;
+  background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.1);
+  border-radius:10px;padding:clamp(6px,0.8vw,10px) clamp(10px,1.2vw,16px);
+  white-space:nowrap;transition:background .15s,color .15s;
+}
+.k-rotate-ctrl:hover{background:rgba(0,0,0,0.08);color:var(--text);}
+.k-rotate-ctrl.active{color:var(--blue);border-color:rgba(29,78,216,0.3);background:rgba(29,78,216,0.06);}
+.k-rotate-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--dim);transition:background .3s;
+}
+.k-rotate-ctrl.active .k-rotate-dot{
+  background:var(--blue);animation:livepulse 1.8s ease-in-out infinite;
+}
+
 /* ═══ FULL TOTAL STRIP ═══ */
 .k-full-strip{
   display:none;
@@ -501,6 +530,10 @@ body::before{
     <div class="k-progress-wrap" id="kProgWrap" style="display:none">
       <div class="k-progress-track"><div class="k-progress-fill" id="kProgFill" style="width:0%"></div></div>
       <div class="k-progress-txt" id="kProgTxt">0/0</div>
+    </div>
+    <div class="k-rotate-ctrl" id="kRotateBtn" onclick="toggleAutoRotate()">
+      <div class="k-rotate-dot"></div>
+      <span id="kRotateTxt">סיבוב אוטומטי</span>
     </div>
     <button class="k-exit-btn" onclick="askExitPin()" style="display:flex;align-items:center;gap:6px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -864,6 +897,51 @@ document.addEventListener('keydown', e => {
 /* ═══ LOGO ═══ */
 function loadLogo() {
   /* logo loading via Firebase or shared state — placeholder */
+}
+
+/* ═══ AUTO-ROTATE ═══ */
+let _rotateActive = false;
+let _rotateTimer = null;
+let _rotateIdx = -1;
+const ROTATE_INTERVAL = 4000; // 4 seconds per wing
+
+function toggleAutoRotate() {
+  _rotateActive = !_rotateActive;
+  const btn = document.getElementById('kRotateBtn');
+  const txt = document.getElementById('kRotateTxt');
+  if (_rotateActive) {
+    btn.classList.add('active');
+    txt.textContent = 'סיבוב פעיל';
+    _rotateIdx = -1;
+    rotateNext();
+  } else {
+    btn.classList.remove('active');
+    txt.textContent = 'סיבוב אוטומטי';
+    clearTimeout(_rotateTimer);
+    _rotateTimer = null;
+    clearRotateHighlight();
+  }
+}
+
+function clearRotateHighlight() {
+  document.querySelectorAll('.k-wing.rotate-highlight').forEach(el => {
+    el.classList.remove('rotate-highlight');
+  });
+}
+
+function rotateNext() {
+  if (!_rotateActive) return;
+  clearRotateHighlight();
+  const cards = document.querySelectorAll('.k-wing');
+  if (!cards.length) {
+    _rotateTimer = setTimeout(rotateNext, ROTATE_INTERVAL);
+    return;
+  }
+  _rotateIdx = (_rotateIdx + 1) % cards.length;
+  const card = cards[_rotateIdx];
+  card.classList.add('rotate-highlight');
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  _rotateTimer = setTimeout(rotateNext, ROTATE_INTERVAL);
 }
 
 /* ═══ INIT ═══ */
