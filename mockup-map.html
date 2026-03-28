@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>מוקאפ — מפת מתקן אינטראקטיבית</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0f1a;--surface:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.08);
+  --text:#e2eaf8;--muted:#5d7494;--dim:#2a3d58;
+  --green:#22c55e;--red:#f43f5e;--amber:#f59e0b;--blue:#3b82f6;
+}
+html,body{width:100%;height:100%;font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 30%,rgba(59,130,246,0.06) 0%,transparent 70%);pointer-events:none;}
+
+.header{
+  position:fixed;top:0;left:0;right:0;z-index:10;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;
+  background:rgba(10,15,26,0.85);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.header-title{font-size:20px;font-weight:900;letter-spacing:-.3px;}
+.header-sub{font-size:12px;color:var(--muted);font-weight:600;}
+.header-badge{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:700;color:var(--green);
+  background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
+  border-radius:8px;padding:5px 12px;
+}
+.header-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ═══ MAP CONTAINER ═══ */
+.map-wrap{
+  position:fixed;inset:0;top:60px;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.facility{
+  position:relative;
+  width:min(90vw,800px);height:min(75vh,600px);
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+  border-radius:24px;
+  overflow:hidden;
+}
+
+/* Grid lines */
+.facility::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* Facility outline */
+.facility-border{
+  position:absolute;inset:20px;
+  border:2px dashed rgba(255,255,255,0.06);
+  border-radius:16px;
+}
+.facility-label{
+  position:absolute;top:30px;left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:700;color:var(--dim);letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+/* ═══ WING BLOCKS ═══ */
+.wing-block{
+  position:absolute;
+  background:rgba(255,255,255,0.04);
+  border:2px solid var(--dim);
+  border-radius:14px;
+  cursor:pointer;
+  transition:all .4s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;overflow:hidden;
+}
+.wing-block::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.03),transparent 70%);
+  pointer-events:none;
+}
+.wing-block:hover{transform:scale(1.05);z-index:5;}
+
+/* States */
+.wing-block.done{
+  border-color:var(--green);
+  background:rgba(34,197,94,0.08);
+  box-shadow:0 0 24px rgba(34,197,94,0.15), inset 0 0 20px rgba(34,197,94,0.05);
+}
+.wing-block.busy{
+  border-color:var(--amber);
+  background:rgba(245,158,11,0.08);
+  box-shadow:0 0 24px rgba(245,158,11,0.15), inset 0 0 20px rgba(245,158,11,0.05);
+}
+.wing-block.waiting{
+  border-color:var(--dim);
+  background:rgba(255,255,255,0.02);
+}
+
+.wing-name{font-size:clamp(13px,1.8vw,17px);font-weight:900;letter-spacing:-.2px;}
+.wing-num{font-size:clamp(28px,5vw,42px);font-weight:900;line-height:1;letter-spacing:-1px;}
+.wing-block.done .wing-num{color:var(--green);}
+.wing-block.busy .wing-num{color:var(--amber);}
+.wing-status{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.wing-block.done .wing-status{color:rgba(34,197,94,0.7);}
+.wing-block.busy .wing-status{color:rgba(245,158,11,0.7);}
+.wing-block.waiting .wing-status{color:var(--dim);}
+
+/* Connector lines */
+.connector{
+  position:absolute;
+  background:var(--dim);
+  opacity:.3;
+}
+.connector.h{height:2px;}
+.connector.v{width:2px;}
+
+/* ═══ CENTER HUB ═══ */
+.center-hub{
+  position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  width:clamp(100px,14vw,140px);height:clamp(100px,14vw,140px);
+  border-radius:50%;
+  background:rgba(59,130,246,0.08);
+  border:2px solid rgba(59,130,246,0.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  box-shadow:0 0 40px rgba(59,130,246,0.1);
+  z-index:3;
+}
+.hub-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;}
+.hub-num{font-size:clamp(30px,5vw,44px);font-weight:900;color:var(--blue);line-height:1;letter-spacing:-1px;}
+.hub-sub{font-size:10px;color:var(--muted);font-weight:600;}
+
+/* ═══ TOOLTIP ═══ */
+.tooltip{
+  position:fixed;z-index:100;
+  background:rgba(13,21,37,0.95);backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:14px;padding:14px 18px;
+  min-width:180px;
+  pointer-events:none;opacity:0;
+  transition:opacity .2s;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+.tooltip.show{opacity:1;}
+.tt-name{font-size:15px;font-weight:900;margin-bottom:6px;}
+.tt-row{display:flex;justify-content:space-between;gap:16px;font-size:12px;color:var(--muted);padding:2px 0;}
+.tt-val{font-weight:800;color:var(--text);}
+
+/* ═══ LEGEND ═══ */
+.legend{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:20px;
+  background:rgba(10,15,26,0.85);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:12px;
+  padding:10px 20px;
+}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:50%;border:2px solid;}
+.legend-dot.done{background:rgba(34,197,94,0.3);border-color:var(--green);}
+.legend-dot.busy{background:rgba(245,158,11,0.3);border-color:var(--amber);}
+.legend-dot.waiting{background:rgba(255,255,255,0.05);border-color:var(--dim);}
+
+/* ═══ MOCKUP LABEL ═══ */
+.mockup-label{
+  position:fixed;top:12px;right:12px;z-index:99;
+  font-size:10px;font-weight:800;color:var(--amber);
+  background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);
+  border-radius:6px;padding:3px 10px;letter-spacing:.5px;
+}
+</style>
+</head>
+<body>
+
+<div class="mockup-label">MOCKUP</div>
+
+<div class="header">
+  <div>
+    <div class="header-title">מפת מתקן — בית הסוהר אביבים</div>
+    <div class="header-sub">ספירת צהריים — 3/5 אגפים דווחו</div>
+  </div>
+  <div class="header-badge">
+    <div class="dot"></div>
+    שידור חי
+  </div>
+</div>
+
+<div class="map-wrap">
+  <div class="facility">
+    <div class="facility-border"></div>
+    <div class="facility-label">תרשים מתקן</div>
+
+    <!-- Wing blocks positioned on the map -->
+    <div class="wing-block done" id="w1" style="top:8%;right:5%;width:26%;height:28%;" data-name="ורד" data-count="24" data-cells="8/8" data-operator="יוסי כ.">
+      <div class="wing-name">ורד</div>
+      <div class="wing-num">24</div>
+      <div class="wing-status">דווח</div>
+    </div>
+
+    <div class="wing-block busy" id="w2" style="top:8%;left:5%;width:26%;height:28%;" data-name="חמנייה" data-count="18" data-cells="5/8" data-operator="דני מ.">
+      <div class="wing-name">חמנייה</div>
+      <div class="wing-num">18</div>
+      <div class="wing-status">בתהליך</div>
+    </div>
+
+    <div class="wing-block done" id="w3" style="bottom:8%;right:5%;width:26%;height:28%;" data-name="כלנית" data-count="31" data-cells="10/10" data-operator="אבי ל.">
+      <div class="wing-name">כלנית</div>
+      <div class="wing-num">31</div>
+      <div class="wing-status">דווח</div>
+    </div>
+
+    <div class="wing-block waiting" id="w4" style="bottom:8%;left:5%;width:26%;height:28%;" data-name="רקפת" data-count="0" data-cells="0/6" data-operator="—">
+      <div class="wing-name">רקפת</div>
+      <div class="wing-num">0</div>
+      <div class="wing-status">ממתין</div>
+    </div>
+
+    <div class="wing-block done" id="w5" style="top:38%;right:33%;width:14%;height:24%;" data-name="נרקיס" data-count="15" data-cells="6/6" data-operator="משה ד.">
+      <div class="wing-name">נרקיס</div>
+      <div class="wing-num">15</div>
+      <div class="wing-status">דווח</div>
+    </div>
+
+    <!-- Center hub -->
+    <div class="center-hub">
+      <div class="hub-label">סה״כ</div>
+      <div class="hub-num" id="hubNum">88</div>
+      <div class="hub-sub">3/5 דווחו</div>
+    </div>
+
+    <!-- Connectors -->
+    <div class="connector h" style="top:22%;right:31%;width:8%;"></div>
+    <div class="connector h" style="top:22%;left:31%;width:8%;"></div>
+    <div class="connector h" style="bottom:22%;right:31%;width:8%;"></div>
+    <div class="connector h" style="bottom:22%;left:31%;width:8%;"></div>
+    <div class="connector v" style="top:30%;right:50%;height:8%;transform:translateX(50%);"></div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tt-name" id="ttName"></div>
+  <div class="tt-row"><span>ספירה</span><span class="tt-val" id="ttCount"></span></div>
+  <div class="tt-row"><span>תאים</span><span class="tt-val" id="ttCells"></span></div>
+  <div class="tt-row"><span>סופר</span><span class="tt-val" id="ttOp"></span></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot done"></div>דווח</div>
+  <div class="legend-item"><div class="legend-dot busy"></div>בתהליך</div>
+  <div class="legend-item"><div class="legend-dot waiting"></div>ממתין</div>
+</div>
+
+<script>
+// Tooltip on hover
+const tt = document.getElementById('tooltip');
+document.querySelectorAll('.wing-block').forEach(el => {
+  el.addEventListener('mouseenter', e => {
+    document.getElementById('ttName').textContent = el.dataset.name;
+    document.getElementById('ttCount').textContent = el.dataset.count;
+    document.getElementById('ttCells').textContent = el.dataset.cells;
+    document.getElementById('ttOp').textContent = el.dataset.operator;
+    tt.classList.add('show');
+  });
+  el.addEventListener('mousemove', e => {
+    tt.style.left = (e.clientX + 16) + 'px';
+    tt.style.top = (e.clientY + 16) + 'px';
+  });
+  el.addEventListener('mouseleave', () => { tt.classList.remove('show'); });
+});
+
+// Simulate live updates
+let total = 88;
+setInterval(() => {
+  const wings = document.querySelectorAll('.wing-block.busy');
+  wings.forEach(w => {
+    const num = w.querySelector('.wing-num');
+    let v = parseInt(num.textContent) || 0;
+    v += Math.random() > 0.6 ? 1 : 0;
+    num.textContent = v;
+    total += (v > parseInt(w.dataset.count) ? 1 : 0);
+    w.dataset.count = v;
+  });
+  document.getElementById('hubNum').textContent = total;
+}, 3000);
+</script>
+</body>
+</html>
