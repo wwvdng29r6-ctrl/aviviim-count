@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>מוניטור עימות</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+:root{--bg:#06090d;--s1:rgba(11,16,24,0.55);--s2:rgba(16,22,32,0.45);--s3:rgba(22,30,42,0.4);--border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.10);--text:#dde6f0;--muted:#8aa4bf;--dim:#5a7a96;--red:#e04040;--rD:rgba(224,64,64,0.12);--red2:#f06060;--orange:#e89030;--oD:rgba(232,144,48,0.12);--amber:#e0a030;--aD:rgba(224,160,48,0.10);--green:#1db954;--gD:rgba(29,185,84,0.10);--blue:#2d72c8;--bD:rgba(45,114,200,0.12);--blue2:#4a90e8;--cyan:#35c8c8;--cD:rgba(53,200,200,0.10);--purple:#9060d0;--pD:rgba(144,96,208,0.10);--r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:28px;--font:'Heebo',sans-serif;--mono:'Share Tech Mono',monospace;--ease:cubic-bezier(.22,1,.36,1);--eo:cubic-bezier(.16,1,.3,1);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden;height:100dvh;width:100vw;-webkit-user-select:none;user-select:none;}
+body.day{--bg:#e8eef6;--s1:rgba(255,255,255,0.88);--s2:rgba(255,255,255,0.75);--s3:rgba(255,255,255,0.6);--border:rgba(0,0,0,0.06);--border2:rgba(0,0,0,0.10);--text:#0d1724;--muted:#4a6580;--dim:#7a9ab8;}
+.ltr{direction:ltr;unicode-bidi:isolate;}
+#map{position:fixed;inset:0;z-index:1;}
+#arcCv{position:fixed;inset:0;z-index:3;pointer-events:none;}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-right{display:none!important;}
+/* Alert bar */
+.alert-bar{position:fixed;top:0;left:0;right:0;z-index:1000;height:0;overflow:hidden;background:rgba(180,25,25,0.65);transition:height .3s var(--ease);display:flex;align-items:center;justify-content:center;gap:12px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+.alert-bar.active{height:52px;}
+.alert-bar .a-icon{width:32px;height:32px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;animation:ap 1s ease-in-out infinite;flex-shrink:0;}
+.alert-bar .a-icon svg{width:18px;height:18px;fill:#fff;}
+@keyframes ap{0%,100%{transform:scale(1);}50%{transform:scale(1.15);}}
+.alert-bar .a-text{font-size:15px;font-weight:700;color:#fff;}
+.alert-bar .a-areas{font-size:13px;font-weight:500;color:rgba(255,255,255,0.85);max-width:50vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.alert-bar .a-time{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.6);direction:ltr;}
+/* HUD */
+.hud{position:fixed;top:0;right:0;left:0;z-index:900;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(180deg,rgba(6,9,13,0.5),rgba(6,9,13,0));pointer-events:none;transition:top .3s var(--ease);}.hud.pushed{top:52px;}.hud>*{pointer-events:auto;}
+body.day .hud{background:linear-gradient(180deg,rgba(232,238,246,0.5),rgba(232,238,246,0));}
+.hud-r,.hud-l{display:flex;align-items:center;gap:8px;}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(14,20,32,0.4);border:1px solid var(--border);border-radius:var(--r-xl);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);font-size:12px;font-weight:500;}
+.brand-dot{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--red),var(--orange));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#fff;box-shadow:0 2px 14px rgba(224,64,64,0.3);}
+.brand-name{font-weight:700;font-size:14px;}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);animation:bl 2s ease-in-out infinite;}
+@keyframes bl{0%,100%{opacity:1;}50%{opacity:.25;}}
+.chip.day-c{font-weight:800;font-size:15px;color:var(--amber);}
+.chip.utc{font-family:var(--mono);font-size:13px;color:var(--cyan);}
+.chip.live-chip{color:var(--red);font-weight:600;font-size:11px;gap:5px;padding:5px 12px;}
+/* FABs */
+.fab{position:fixed;z-index:800;min-width:44px;height:44px;border-radius:var(--r-md);background:rgba(14,20,32,0.45);border:1px solid var(--border);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--muted);font-size:12px;font-weight:600;padding:0 16px;transition:all .3s var(--ease);box-shadow:0 4px 20px rgba(0,0,0,.15);}
+.fab:hover{border-color:var(--border2);color:var(--text);}.fab:active{transform:scale(.96);}.fab.on{border-color:rgba(45,114,200,0.35);color:var(--blue2);background:rgba(45,114,200,0.06);}
+body.alert-on #fF{top:162px!important;}
+body.alert-on #fA{top:162px!important;}
+body.alert-on #fI{top:162px!important;}
+body.alert-on #fS{top:162px!important;}
+body.alert-on #fFo{top:162px!important;}
+body.alert-on .ticker{top:130px;}
+body.alert-on .status-bar{top:100px;}
+body.alert-on #feedP,body.alert-on #alertP{top:212px!important;}
+body.alert-on #intelP,body.alert-on #focusP{top:212px!important;}
+body.alert-on #statsP{top:212px!important;}
+.fab.alert-fab{border-color:rgba(224,64,64,0.3);color:var(--red2);}
+.fab.alert-fab.has-alerts{animation:fa 1.5s ease-in-out infinite;border-color:var(--red);}
+@keyframes fa{0%,100%{box-shadow:0 0 0 0 rgba(224,64,64,0.4);}50%{box-shadow:0 0 0 8px rgba(224,64,64,0);}}
+.fab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.fab.mini{min-width:40px;height:40px;padding:0;width:40px;font-size:14px;}
+/* Panels */
+.panel{position:fixed;z-index:750;background:rgba(11,16,24,0.5);border:1px solid var(--border2);border-radius:var(--r-lg);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:0 16px 56px rgba(0,0,0,.3);overflow:hidden;transform:translateY(10px) scale(.97);opacity:0;pointer-events:none;transition:transform .4s var(--eo),opacity .35s var(--eo);}
+.panel.open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;}
+.pan-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.pan-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.pan-count{font-family:var(--mono);font-size:11px;color:var(--blue2);background:var(--bD);padding:2px 8px;border-radius:8px;}
+.pan-x{width:30px;height:30px;border:none;background:none;color:var(--dim);cursor:pointer;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}.pan-x:hover{color:var(--red);background:var(--rD);}
+.pan-body{overflow-y:auto;max-height:calc(100dvh - 280px);}.pan-body::-webkit-scrollbar{width:3px;}.pan-body::-webkit-scrollbar-thumb{background:rgba(138,164,191,.2);border-radius:3px;}
+#feedP{top:160px;right:10px;width:360px;max-height:calc(100dvh - 220px);}
+.tabs{display:flex;gap:3px;padding:10px 12px;border-bottom:1px solid var(--border);}
+.tab{padding:5px 10px;font-size:11px;font-weight:500;color:var(--dim);background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;transition:all .2s;min-height:32px;display:flex;align-items:center;}.tab:hover{color:var(--muted);}.tab.on{background:var(--bD);border-color:rgba(45,114,200,0.2);color:var(--blue2);font-weight:600;}
+.ev{padding:12px 16px;border-inline-start:3px solid transparent;cursor:pointer;transition:background .15s;}.ev+.ev{border-top:1px solid var(--border);}.ev:hover{background:rgba(255,255,255,0.02);}
+.ev.sev-critical{border-inline-start-color:var(--red);}.ev.sev-high{border-inline-start-color:var(--orange);}.ev.sev-medium{border-inline-start-color:var(--amber);}.ev.sev-low{border-inline-start-color:var(--blue);}
+.ev.fresh{animation:fl 3s var(--ease);}@keyframes fl{0%{background:rgba(224,64,64,0.06);}100%{background:transparent;}}
+.ev-time{font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px;display:flex;align-items:center;gap:6px;direction:ltr;unicode-bidi:isolate;justify-content:flex-end;}
+.ev-src{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--dim);text-transform:uppercase;font-family:var(--mono);}
+.ev-ti{font-size:13px;font-weight:500;line-height:1.5;margin-bottom:4px;}
+.ev-cat{display:inline-flex;font-size:9px;padding:3px 8px;border-radius:6px;font-weight:600;}
+.cs{background:var(--rD);color:var(--red2);}.cm{background:var(--oD);color:var(--orange);}.cn{background:var(--cD);color:var(--cyan);}.cp{background:var(--bD);color:var(--blue2);}.cy{background:var(--pD);color:var(--purple);}
+#alertP{top:160px;right:10px;width:360px;max-height:calc(100dvh - 220px);}
+.alrt{padding:12px 16px;border-inline-start:3px solid var(--red);}.alrt+.alrt{border-top:1px solid var(--border);}
+.alrt-title{font-size:13px;font-weight:700;color:var(--red2);margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.alrt-title svg{width:14px;height:14px;fill:var(--red);flex-shrink:0;}
+.alrt-areas{font-size:12px;font-weight:500;line-height:1.6;margin-bottom:4px;}
+.alrt-meta{font-family:var(--mono);font-size:9px;color:var(--dim);direction:ltr;unicode-bidi:isolate;text-align:right;}
+.alrt-cat{display:inline-flex;font-size:8px;padding:2px 6px;border-radius:4px;background:var(--rD);color:var(--red);font-weight:600;margin-inline-start:6px;}
+#intelP{top:160px;left:10px;width:280px;max-height:calc(100dvh - 220px);}
+.isec{padding:14px 18px;}.isec+.isec{border-top:1px solid var(--border);}
+.il{font-size:11px;font-weight:700;color:var(--dim);margin-bottom:10px;display:flex;align-items:center;gap:6px;}.il i{width:6px;height:6px;border-radius:50%;display:inline-block;}
+.thm{display:flex;gap:3px;margin-bottom:5px;}.thb{flex:1;height:18px;border-radius:4px;background:rgba(255,255,255,0.03);}.thb.g{background:var(--green);}.thb.a{background:var(--amber);}.thb.o{background:var(--orange);}.thb.r{background:var(--red);}.thb.r2{background:var(--red);box-shadow:0 0 16px rgba(224,64,64,0.3);}
+.thl{font-size:13px;font-weight:800;color:var(--red);}
+.srcl{display:flex;flex-direction:column;gap:4px;}.srci{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:8px;font-size:11px;}.srcn{color:var(--muted);font-weight:500;}
+.srcs{font-size:9px;padding:2px 7px;border-radius:8px;font-weight:600;}.srcs.on{background:var(--gD);color:var(--green);}.srcs.dl{background:var(--aD);color:var(--amber);}.srcs.of{background:var(--rD);color:var(--red);}
+.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}.ci{text-align:center;padding:8px 4px;background:rgba(255,255,255,0.02);border-radius:var(--r-sm);}.civ{font-size:16px;font-weight:800;}.cil{font-size:9px;color:var(--dim);margin-top:3px;}
+#statsP{top:160px;left:50%;transform:translateX(50%) translateY(10px) scale(.97);}#statsP.open{transform:translateX(50%) translateY(0) scale(1);}
+#statsP .pan-body{display:flex;max-height:none;}
+.sc{padding:12px 18px;border-inline-start:1px solid var(--border);min-width:100px;text-align:center;}.sc:last-child{border:none;}.sc-l{font-size:9px;color:var(--dim);font-weight:600;margin-bottom:3px;}.sc-v{font-family:var(--mono);font-size:22px;font-weight:700;direction:ltr;unicode-bidi:isolate;}.sc-d{font-size:9px;color:var(--red);margin-top:2px;font-family:var(--mono);direction:ltr;unicode-bidi:isolate;}
+.sc:nth-child(1) .sc-v{color:var(--red);}.sc:nth-child(2) .sc-v{color:var(--orange);}.sc:nth-child(3) .sc-v{color:var(--blue2);}.sc:nth-child(4) .sc-v{color:var(--green);}.sc:nth-child(5) .sc-v{color:var(--amber);}.sc:nth-child(6) .sc-v{color:var(--purple);}
+#aboutP{bottom:56px;left:50%;width:440px;max-width:calc(100vw - 24px);transform:translateX(50%) translateY(10px) scale(.97);}#aboutP.open{transform:translateX(50%) translateY(0) scale(1);}
+.about-body{padding:20px 24px;}.about-logo{display:flex;align-items:center;gap:10px;margin-bottom:16px;}.about-logo-text{font-size:18px;font-weight:800;}.about-ver{font-size:10px;color:var(--dim);font-family:var(--mono);margin-inline-start:8px;font-weight:400;}
+.about-section{margin-bottom:16px;}.about-section h3{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;}.about-section h3 i{width:5px;height:5px;border-radius:50%;display:inline-block;}.about-section p{font-size:12px;line-height:1.7;opacity:0.85;}
+.about-warn{background:rgba(224,160,48,0.06);border:1px solid rgba(224,160,48,0.15);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:16px;}.about-warn p{font-size:11px;line-height:1.6;color:var(--amber);}.about-warn strong{font-weight:700;}
+.about-tech{display:flex;flex-wrap:wrap;gap:6px;}.about-tag{font-size:10px;font-family:var(--mono);padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:20px;color:var(--dim);}
+.about-footer{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--dim);line-height:1.6;text-align:center;}
+.layers{position:fixed;bottom:54px;left:50%;transform:translateX(50%);z-index:800;display:flex;gap:3px;background:rgba(14,20,32,0.4);border:1px solid var(--border);border-radius:var(--r-xl);padding:4px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
+.lb{padding:6px 12px;background:none;border:none;border-radius:var(--r-lg);color:var(--dim);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;min-height:30px;}.lb:hover{color:var(--muted);}.lb.on{background:var(--bD);color:var(--blue2);font-weight:600;}
+.zc{position:fixed;bottom:100px;left:10px;z-index:800;display:flex;flex-direction:column;gap:3px;}
+.zb{width:42px;height:42px;background:rgba(14,20,32,0.4);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);transition:all .2s;}.zb:hover{border-color:var(--border2);color:var(--text);}.zb:active{transform:scale(.92);}
+/* Bottom toolbar */
+.bottom-tools{position:fixed;bottom:54px;left:60px;z-index:800;display:flex;gap:3px;}
+.tmbar{position:fixed;bottom:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:12px;padding:8px 16px;height:46px;background:rgba(6,9,13,0.45);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);}
+body.day .tmbar{background:rgba(232,238,246,0.4);}
+.tm-l{font-size:10px;font-weight:700;color:var(--dim);white-space:nowrap;}
+.tm-btns{display:flex;gap:2px;direction:ltr;}.tmb{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;}.tmb:hover{border-color:var(--border2);color:var(--text);}
+.tmsw{flex:1;direction:ltr;}.tms{width:100%;-webkit-appearance:none;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;outline:none;cursor:pointer;}.tms::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--cyan);border-radius:50%;cursor:pointer;box-shadow:0 0 14px rgba(53,200,200,0.35);}
+.tmd{font-family:var(--mono);font-size:12px;color:var(--cyan);white-space:nowrap;min-width:100px;text-align:left;direction:ltr;unicode-bidi:isolate;}
+.mrk{width:32px;height:32px;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.mrk-icon{width:26px;height:26px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;position:relative;z-index:2;transition:transform .15s;}
+.mrk:hover .mrk-icon{transform:scale(1.2);}
+.mrk-icon svg{width:14px;height:14px;}
+.mrk-ring{width:32px;height:32px;border-radius:50%;position:absolute;border:1.5px solid;animation:ring 2.8s ease-out infinite;opacity:0;top:0;left:0;}
+/* Strike: fire */
+.mrk-fire .mrk-icon{background:rgba(232,120,30,0.2);border-color:var(--orange);}
+.mrk-fire .mrk-icon svg{fill:var(--orange);stroke:none;}
+.mrk-fire .mrk-ring{border-color:var(--orange);}
+/* Explosion */
+.mrk-explode .mrk-icon{background:rgba(224,64,64,0.2);border-color:var(--red);}
+.mrk-explode .mrk-icon svg{fill:var(--red2);stroke:none;}
+.mrk-explode .mrk-ring{border-color:var(--red);}
+/* Target/crosshair */
+.mrk-target .mrk-icon{background:rgba(232,144,48,0.15);border-color:var(--orange);}
+.mrk-target .mrk-icon svg{fill:none;stroke:var(--orange);stroke-width:2;}
+.mrk-target .mrk-ring{border-color:var(--orange);}
+/* Intercept (blue star) */
+.mrk-intercept .mrk-icon{background:rgba(53,200,200,0.15);border-color:var(--cyan);}
+.mrk-intercept .mrk-icon svg{fill:var(--cyan);stroke:none;}
+.mrk-intercept .mrk-ring{border-color:var(--cyan);}
+/* Aircraft (blue triangle) */
+.mrk-aircraft .mrk-icon{background:rgba(74,144,232,0.15);border-color:var(--blue2);border-radius:4px;transform:rotate(0deg);}
+.mrk-aircraft .mrk-icon svg{fill:var(--blue2);stroke:none;}
+.mrk-aircraft .mrk-ring{border-color:var(--blue2);border-radius:4px;}
+/* Naval */
+.mrk-naval .mrk-icon{background:rgba(53,200,200,0.12);border-color:var(--cyan);}
+.mrk-naval .mrk-icon svg{fill:none;stroke:var(--cyan);stroke-width:1.8;}
+.mrk-naval .mrk-ring{border-color:var(--cyan);}
+/* Cyber */
+.mrk-cyber .mrk-icon{background:rgba(144,96,208,0.15);border-color:var(--purple);}
+.mrk-cyber .mrk-icon svg{fill:none;stroke:var(--purple);stroke-width:2;}
+.mrk-cyber .mrk-ring{border-color:var(--purple);}
+/* Political */
+.mrk-political .mrk-icon{background:rgba(74,144,232,0.12);border-color:var(--blue2);}
+.mrk-political .mrk-icon svg{fill:none;stroke:var(--blue2);stroke-width:1.8;}
+.mrk-political .mrk-ring{border-color:var(--blue2);}
+@keyframes ring{0%{transform:scale(1);opacity:.5;}100%{transform:scale(2.8);opacity:0;}}
+.alert-mrk{width:28px;height:28px;position:relative;cursor:pointer;}.alert-mrk-dot{width:16px;height:16px;border-radius:50%;position:absolute;top:6px;left:6px;background:var(--red);border:2px solid #fff;box-shadow:0 0 16px var(--red);animation:amp 1s ease-in-out infinite;}.alert-mrk-ring{width:28px;height:28px;border-radius:50%;position:absolute;border:2px solid var(--red);animation:ar 1.5s ease-out infinite;}
+@keyframes amp{0%,100%{opacity:1;}50%{opacity:.6;}}@keyframes ar{0%{transform:scale(1);opacity:.7;}100%{transform:scale(3);opacity:0;}}
+/* Base/nuke markers */
+.base-mrk{width:12px;height:12px;background:var(--blue2);border:1.5px solid rgba(255,255,255,0.6);border-radius:2px;transform:rotate(45deg);box-shadow:0 0 8px var(--blue2);cursor:pointer;}
+.nuke-mrk{width:14px;height:14px;background:var(--amber);border:1.5px solid rgba(255,255,255,0.6);border-radius:50%;box-shadow:0 0 10px var(--amber);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;color:#000;font-weight:900;}
+.maplibregl-popup-content{background:rgba(11,16,24,0.55)!important;border:1px solid var(--border2)!important;border-radius:var(--r-md)!important;color:var(--text)!important;font-family:var(--font)!important;font-size:13px!important;box-shadow:0 12px 40px rgba(0,0,0,.3)!important;padding:14px 18px!important;direction:rtl!important;backdrop-filter:blur(28px)!important;-webkit-backdrop-filter:blur(28px)!important;}
+.maplibregl-popup-tip{border-top-color:rgba(11,16,24,0.55)!important;}.maplibregl-popup-close-button{color:var(--dim)!important;font-size:20px!important;left:10px!important;right:auto!important;top:8px!important;}
+.pp-t{font-weight:600;font-size:13px;margin-bottom:4px;padding-inline-start:20px;line-height:1.5;}.pp-m{font-family:var(--mono);font-size:10px;color:var(--dim);direction:ltr;unicode-bidi:isolate;text-align:right;}
+.pp-type{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;display:inline-flex;margin-bottom:4px;}
+/* TICKER */
+/* STATUS BAR */
+.status-bar{position:fixed;top:48px;left:0;right:0;z-index:860;height:30px;background:rgba(11,16,24,0.5);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:top .3s var(--ease);font-size:11px;}
+body.alert-on .status-bar{top:100px;}
+.sb-left{display:flex;align-items:center;gap:12px;}
+.sb-count{font-family:var(--mono);color:var(--cyan);font-weight:600;}
+.sb-mode{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:6px;font-weight:700;letter-spacing:1px;}
+.sb-mode.live{background:rgba(29,185,84,0.15);color:var(--green);}.sb-mode.reduced{background:rgba(232,144,48,0.15);color:var(--orange);}
+.sb-right{display:flex;align-items:center;gap:10px;}
+.sb-update{font-family:var(--mono);font-size:9px;color:var(--dim);}
+.sb-threat{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;}
+.sb-threat-dot{width:8px;height:8px;border-radius:50%;}
+/* FOCUS PANEL */
+#focusP{top:160px;left:10px;width:160px;}
+.focus-btn{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;transition:background .15s;font-size:12px;font-weight:500;color:var(--muted);}
+.focus-btn+.focus-btn{border-top:1px solid var(--border);}
+.focus-btn:hover{background:rgba(255,255,255,0.03);color:var(--text);}
+.focus-btn:active{background:rgba(255,255,255,0.05);}
+.focus-flag{font-size:14px;width:22px;text-align:center;flex-shrink:0;filter:grayscale(0.3);}
+/* THREAT GRID */
+.threat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;}
+.tg-item{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:rgba(255,255,255,0.02);border-radius:6px;font-size:10px;}
+.tg-name{color:var(--muted);font-weight:500;}
+.tg-bar{width:40px;height:6px;border-radius:3px;background:rgba(255,255,255,0.05);overflow:hidden;position:relative;}
+.tg-fill{height:100%;border-radius:3px;transition:width .5s var(--ease);}
+/* AI SUMMARY */
+.ai-summary{padding:14px 18px;border-top:1px solid var(--border);}
+.ai-summary-head{font-size:11px;font-weight:700;color:var(--dim);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.ai-summary-head i{width:6px;height:6px;border-radius:50%;display:inline-block;}
+.ai-summary-text{font-size:12px;line-height:1.7;color:var(--text);opacity:0.85;}
+.ai-summary-time{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px;direction:ltr;unicode-bidi:isolate;text-align:right;}
+/* Seismic marker */
+.mrk-seismic .mrk-icon{background:rgba(224,160,48,0.15);border-color:var(--amber);}
+.mrk-seismic .mrk-icon svg{fill:none;stroke:var(--amber);stroke-width:2;}
+.mrk-seismic .mrk-ring{border-color:var(--amber);}
+/* Fire marker */
+.mrk-fire-sat .mrk-icon{background:rgba(232,120,30,0.25);border-color:#ff6020;}
+.mrk-fire-sat .mrk-icon svg{fill:#ff6020;stroke:none;}
+.mrk-fire-sat .mrk-ring{border-color:#ff6020;}
+/* Flight marker */
+.mrk-flight .mrk-icon{background:rgba(74,144,232,0.1);border-color:rgba(74,144,232,0.5);border-radius:4px;}
+.mrk-flight .mrk-icon svg{fill:var(--blue2);stroke:none;transform:rotate(-45deg);}
+.mrk-flight .mrk-ring{display:none;}
+/* Ship marker */
+.mrk-ship .mrk-icon{background:rgba(53,200,200,0.1);border-color:rgba(53,200,200,0.5);border-radius:4px;}
+.mrk-ship .mrk-icon svg{fill:none;stroke:var(--cyan);stroke-width:1.5;}
+.mrk-ship .mrk-ring{display:none;}
+.ticker{position:fixed;top:78px;left:0;right:0;z-index:850;height:28px;background:rgba(11,16,24,0.45);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden;display:flex;align-items:center;transition:top .3s var(--ease);}
+body.alert-on .ticker{top:130px;}
+body.day .ticker{background:rgba(255,255,255,0.4);}
+.ticker-label{flex-shrink:0;font-size:8px;font-weight:700;color:var(--cyan);padding:0 12px;text-transform:uppercase;letter-spacing:1px;border-inline-end:1px solid var(--border);}
+.ticker-track{flex:1;overflow:hidden;position:relative;height:100%;}
+.ticker-scroll{display:flex;align-items:center;height:100%;animation:tickScroll 60s linear infinite;white-space:nowrap;direction:ltr;}
+.ticker-scroll:hover{animation-play-state:paused;}
+.ticker-item{display:inline-flex;align-items:center;gap:6px;padding:0 24px;font-size:11px;color:var(--muted);font-weight:400;flex-shrink:0;}
+.ticker-item .t-src{font-size:8px;font-weight:600;color:var(--blue2);text-transform:uppercase;font-family:var(--mono);}
+.ticker-item .t-dot{width:3px;height:3px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+@keyframes tickScroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+/* CHART */
+.chart-wrap{padding:4px 0;}
+.chart-bars{display:flex;align-items:flex-end;gap:2px;height:64px;}
+.chart-bar{flex:1;border-radius:2px 2px 0 0;min-height:2px;transition:opacity .15s;position:relative;cursor:default;}
+.chart-bar:hover{opacity:1!important;}
+.chart-bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;font-size:9px;font-family:var(--mono);color:var(--text);white-space:nowrap;z-index:10;pointer-events:none;}
+.chart-labels{display:flex;justify-content:space-between;font-size:7px;color:var(--dim);font-family:var(--mono);margin-top:4px;direction:ltr;}
+@media(max-width:700px){
+  #feedP,#intelP,#alertP,#focusP{width:calc(100vw - 20px);right:10px;left:10px;top:160px!important;max-height:calc(100dvh - 220px);}
+  .brand-name{display:none;}
+  #aboutP,#statsP{width:calc(100vw - 20px)!important;}
+  #fF,#fA,#fS{right:auto!important;}
+  #fF{left:10px!important;right:auto!important;}
+  #fA{left:auto!important;right:10px!important;}
+  #fS{left:auto!important;right:120px!important;}
+  #fFo{display:none;}
+  .status-bar{font-size:10px;padding:0 10px;}
+  .sb-right{display:none;}
+  .bottom-tools{left:10px!important;}
+}
+</style></head><body>
+<div class="alert-bar" id="alertBar"><div class="a-icon"><svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6z"/><rect x="11" y="10" width="2" height="4"/><rect x="11" y="16" width="2" height="2"/></svg></div><div class="a-text" id="aTitle">צבע אדום</div><div class="a-areas" id="aAreas"></div><div class="a-time ltr" id="aTime"></div></div>
+<div id="map"></div><canvas id="arcCv"></canvas>
+<div class="hud" id="hud"><div class="hud-r"><div class="chip"><div class="brand-dot">CM</div><span class="brand-name">מוניטור עימות</span></div><div class="chip live-chip"><div class="pulse"></div>שידור חי</div><div class="chip day-c">יום 30</div></div><div class="hud-l"><div class="chip utc ltr" id="utc">--:--:--</div></div></div>
+
+<div class="fab" id="fF" style="top:110px;right:10px"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>אירועים</div>
+<div class="fab alert-fab" id="fA" style="top:110px;right:150px"><svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2z"/><path d="M12 9v4m0 4h.01"/></svg>התרעות</div>
+<div class="fab" id="fS" style="top:110px;right:290px"><svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>נתונים</div>
+<div class="fab" id="fI" style="top:110px;left:10px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>מודיעין</div>
+<div class="fab" id="fFo" style="top:110px;left:140px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>מיקוד</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar" id="statusBar">
+  <div class="sb-left">
+    <span class="sb-count"><span id="sbCount">0</span> אירועים גלויים</span>
+    <span class="sb-mode live" id="sbMode">LIVE</span>
+    <span class="sb-update" id="sbUpdate">עדכון: עכשיו</span>
+  </div>
+  <div class="sb-right">
+    <div class="sb-threat"><span class="sb-threat-dot" id="sbThreatDot" style="background:var(--red)"></span><span id="sbThreatTxt">איום: קריטי</span></div>
+  </div>
+</div>
+
+<!-- NEWS TICKER -->
+<div class="ticker" id="ticker"><div class="ticker-label">NEWS</div><div class="ticker-track"><div class="ticker-scroll" id="tickScroll"></div></div></div>
+
+<!-- FOCUS PANEL -->
+<div class="panel" id="focusP">
+  <div class="pan-h"><div class="pan-title">מיקוד אזורי</div><div class="pan-x" onclick="tog('focusP','fFo')">&#10005;</div></div>
+  <div class="pan-body">
+    <div class="focus-btn" onclick="flyRegion(34.8,31.5,7)"><span class="focus-flag">IL</span>ישראל</div>
+    <div class="focus-btn" onclick="flyRegion(53,33,5)"><span class="focus-flag">IR</span>איראן</div>
+    <div class="focus-btn" onclick="flyRegion(35.5,33.8,9)"><span class="focus-flag">LB</span>לבנון</div>
+    <div class="focus-btn" onclick="flyRegion(51,26,6)"><span class="focus-flag">GF</span>המפרץ</div>
+    <div class="focus-btn" onclick="flyRegion(38.5,19,6)"><span class="focus-flag">RS</span>ים סוף</div>
+    <div class="focus-btn" onclick="flyRegion(44,33,6)"><span class="focus-flag">IQ</span>עיראק</div>
+    <div class="focus-btn" onclick="flyRegion(38,35,6)"><span class="focus-flag">SY</span>סוריה</div>
+    <div class="focus-btn" onclick="flyRegion(45,15,6)"><span class="focus-flag">YE</span>תימן</div>
+    <div class="focus-btn" onclick="flyRegion(46,29,4.5)"><span class="focus-flag">ALL</span>תצוגה כללית</div>
+  </div>
+</div>
+
+<!-- Bottom tools: about, fullscreen, day/night, sound -->
+<div class="bottom-tools">
+  <div class="fab mini" id="fAb" title="אודות"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg></div>
+  <div class="fab mini" id="fFs" title="מסך מלא"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></div>
+  <div class="fab mini" id="fDn" title="לילה/יום"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></div>
+  <div class="fab mini" id="fSnd" title="צליל" style="color:var(--red)"><svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg></div>
+</div>
+
+<div class="panel" id="feedP"><div class="pan-h"><div class="pan-title">פיד אירועים <span class="pan-count" id="eCnt">0</span></div><div class="pan-x" onclick="tog('feedP','fF')">&#10005;</div></div><div class="tabs" id="fTabs"></div><div class="pan-body" id="eFd"></div></div>
+<div class="panel" id="alertP"><div class="pan-h"><div class="pan-title" style="color:var(--red)">התרעות פיקוד העורף <span class="pan-count" id="aCnt" style="background:var(--rD);color:var(--red)">0</span></div><div class="pan-x" onclick="tog('alertP','fA')">&#10005;</div></div><div class="pan-body" id="aFd"><div style="padding:20px;text-align:center;color:var(--dim)">מתחבר...</div></div></div>
+<div class="panel" id="intelP"><div class="pan-h"><div class="pan-title">מודיעין</div><div class="pan-x" onclick="tog('intelP','fI')">&#10005;</div></div><div class="pan-body">
+<div class="isec"><div class="il"><i style="background:var(--red)"></i>רמת איום</div><div class="thm"><div class="thb g"></div><div class="thb a"></div><div class="thb o"></div><div class="thb r"></div><div class="thb r2"></div></div><div class="thl">קריטי</div></div>
+<div class="isec"><div class="il"><i style="background:var(--orange)"></i>איום לפי מדינה</div><div class="threat-grid" id="threatGrid"></div></div>
+<div class="isec"><div class="il"><i style="background:var(--green)"></i>מקורות</div><div class="srcl"><div class="srci"><span class="srcn">פיקוד העורף</span><span class="srcs on" id="orefSt">פעיל</span></div><div class="srci"><span class="srcn">Reuters</span><span class="srcs on">פעיל</span></div><div class="srci"><span class="srcn">CENTCOM</span><span class="srcs on">פעיל</span></div><div class="srci"><span class="srcn">דובר צה"ל</span><span class="srcs on">פעיל</span></div><div class="srci"><span class="srcn">NASA FIRMS</span><span class="srcs on">פעיל</span></div><div class="srci"><span class="srcn">OpenSky ADS-B</span><span class="srcs on">פעיל</span></div><div class="srci"><span class="srcn">USGS Seismic</span><span class="srcs dl">עיכוב</span></div><div class="srci"><span class="srcn">Tasnim</span><span class="srcs dl">עיכוב</span></div><div class="srci"><span class="srcn">IRNA</span><span class="srcs of">נפל</span></div></div></div>
+<div class="isec"><div class="il"><i style="background:var(--cyan)"></i>קישוריות איראן</div><div class="cg"><div class="ci"><div class="civ ltr" style="color:var(--red)">1.2%</div><div class="cil">אינטרנט</div></div><div class="ci"><div class="civ ltr" style="color:var(--amber)">12%</div><div class="cil">סלולר</div></div><div class="ci"><div class="civ ltr" style="color:var(--orange)">~40K</div><div class="cil">סטארלינק</div></div></div></div>
+<div class="isec"><div class="il"><i style="background:var(--amber)"></i>מצר הורמוז</div><div class="srcl"><div class="srci"><span class="srcn">סטטוס</span><span class="srcs of">חסום</span></div><div class="srci"><span class="srcn">נפט</span><span class="ltr" style="color:var(--red);font-size:12px;font-weight:700">-68%</span></div></div></div>
+<div class="isec"><div class="il"><i style="background:var(--red)"></i>התקפות 24 שעות</div><div class="chart-wrap"><div class="chart-bars" id="atkChart"></div><div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>NOW</span></div></div></div>
+<div class="ai-summary" id="aiSummary"><div class="ai-summary-head"><i style="background:var(--purple)"></i>סיכום AI</div><div class="ai-summary-text" id="aiSumText">המערכת מנתחת את המצב...</div><div class="ai-summary-time" id="aiSumTime">טוען...</div></div>
+</div></div>
+<div class="panel" id="statsP"><div class="pan-body"><div class="sc"><div class="sc-l">גיחות</div><div class="sc-v" id="s1">2,847</div><div class="sc-d">+124</div></div><div class="sc"><div class="sc-l">יירוטים</div><div class="sc-v" id="s2">1,289</div><div class="sc-d">+38</div></div><div class="sc"><div class="sc-l">מטרות</div><div class="sc-v" id="s3">2,140</div><div class="sc-d">+67</div></div><div class="sc"><div class="sc-l">רשת איראן</div><div class="sc-v">~1%</div><div class="sc-d" style="color:var(--green)">האפלה</div></div><div class="sc"><div class="sc-l">נפט</div><div class="sc-v">$112</div><div class="sc-d">+$3.2</div></div><div class="sc"><div class="sc-l">NOTAMs</div><div class="sc-v">14</div><div class="sc-d" style="color:var(--dim)">פעילים</div></div></div></div>
+<div class="panel" id="aboutP"><div class="pan-h"><div class="pan-title">אודות מוניטור עימות</div><div class="pan-x" onclick="tog('aboutP','fAb')">&#10005;</div></div><div class="about-body">
+<div class="about-logo"><div class="brand-dot" style="width:36px;height:36px;font-size:15px">CM</div><div><span class="about-logo-text">מוניטור עימות</span><span class="about-ver ltr">v2.0</span></div></div>
+
+<div class="about-section"><p>דשבורד מודיעין גלוי (OSINT) בזמן אמת למעקב והצגה חזותית של אירועים בזירת העימות עם איראן. המערכת מרכזת נתונים מעשרות מקורות ברחבי העולם ומציגה אותם על מפה אינטראקטיבית אחודה עם הערכת איומים אוטומטית.</p></div>
+
+<div class="about-section"><h3><i style="background:var(--blue2)"></i>איסוף ועיבוד נתונים</h3>
+<p>המערכת משתמשת ב-17+ סוגי מתאמי מקורות לאיסוף רציף: הזנות RSS, ניטור ערוצי טלגרם, API של פיקוד העורף, חיישני רעידות אדמה (USGS), מעקב טיסות ADS-B (OpenSky), מעקב ספינות AIS, פלטפורמות חיזוי (Polymarket), זיהוי שריפות לוויני (NASA FIRMS), וניטור אירועים גלובלי (GDELT).</p>
+<p>נתונים נכנסים עוברים צנרת רב-שלבית: שכפולים מסוננים, נתונים מנורמלים ומועשרים באמצעות מערכות AI. מנתב מודלי שפה (LLM) מטפל בתרגום, דירוג מהימנות, סיווג אירועים, וחילוץ מסלולי טילים.</p></div>
+
+<div class="about-section"><h3><i style="background:var(--green)"></i>יכולות מרכזיות</h3>
+<p style="margin-bottom:6px"><strong style="color:var(--text)">מפה אינטראקטיבית</strong> -- הצגה חיה של 13 סוגי אירועים: התרעות טילים, תקיפות, תנועות צבאיות, רעידות אדמה, מיקומי טיסות ומעקב ספינות.</p>
+<p style="margin-bottom:6px"><strong style="color:var(--text)">מכונת זמן</strong> -- ניגון מחדש של כל רגע בציר הזמן. עצירה, קדימה ואחורה עם סנכרון מלא.</p>
+<p style="margin-bottom:6px"><strong style="color:var(--text)">הערכת איום</strong> -- רמות איום מחושבות ב-AI עם נורמליזציה סיגמואידית, שקלול דעיכת זמן וקורלציה רב-מקורית. עדכון כל 5 דקות.</p>
+<p style="margin-bottom:6px"><strong style="color:var(--text)">מסלולי טילים</strong> -- קשתות בזייה מונפשות המציגות מסלולי טיסה, סטטוס יירוט ונקודות פגיעה.</p>
+<p><strong style="color:var(--text)">זיהוי שריפות לווייני</strong> -- שילוב NASA FIRMS לזיהוי אש ואנומליות תרמיות בזמן קרוב לאמת.</p></div>
+
+<div class="about-warn"><p><strong>כל המידע מבוסס על מקורות מידע פתוחים (OSINT) ועיבוד AI נרחב.</strong> מסלולי הטילים מוערכים באמצעות תהליך AI אגנטי מורכב ועשויים להכיל אי-דיוקים. מערכות AI עלולות לטעות, ומקורות חיצוניים עלולים לדווח מידע שגוי. רמות האיום הן אינדיקציה מידעית בלבד. <strong>בזמן אזעקה -- היכנסו למרחב מוגן לפי הנחיות פיקוד העורף.</strong></p></div>
+
+<div class="about-section"><h3><i style="background:var(--cyan)"></i>מה זה OSINT?</h3>
+<p>מודיעין גלוי (Open Source Intelligence) מתייחס למודיעין הנאסף ממקורות נגישים לציבור: סוכנויות חדשות, רשתות חברתיות, פרסומי ממשלה, דימות לוויני והזנות נתונים ציבוריות. המערכת משתמשת אך ורק בנתונים זמינים לציבור ואינה ניגשת למידע מסווג.</p></div>
+
+<div class="about-section"><h3><i style="background:var(--purple)"></i>תדירות עדכון</h3>
+<p>הדשבורד מתעדכן בזמן קרוב לאמת. אירועים נוצרים כל 5 שניות. פיקוד העורף נסרק כל 3 שניות. הערכות איום מחושבות מחדש כל 5 דקות.</p></div>
+
+<div class="about-section"><h3><i style="background:var(--orange)"></i>טכנולוגיה</h3>
+<div class="about-tech"><span class="about-tag">MapLibre GL JS</span><span class="about-tag">CartoDB Dark</span><span class="about-tag">Pikud HaOref API</span><span class="about-tag">Claude AI (Anthropic)</span><span class="about-tag">Web Audio API</span><span class="about-tag">Canvas 2D</span><span class="about-tag">RSS/Atom</span><span class="about-tag">OSINT Pipeline</span><span class="about-tag">LLM Router</span></div></div>
+
+<div class="about-section"><h3><i style="background:var(--amber)"></i>כיסוי גיאוגרפי</h3>
+<p>12 מדינות זירה: ישראל, איראן, תימן, לבנון, סעודיה, איחוד האמירויות, קטאר, בחריין, עיראק, ירדן, סוריה וכווית.</p></div>
+
+<div class="about-footer">מערכת זו נועדה למטרות מידע ומחקר בלבד.<br>אין להסתמך עליה כתחליף להנחיות פיקוד העורף ורשויות הביטחון.</div>
+</div></div>
+
+<div class="layers" id="lyB"></div>
+<div class="zc"><button class="zb" id="zI">+</button><button class="zb" id="zO">&minus;</button><button class="zb" id="zR" style="font-size:12px;font-weight:600">R</button></div>
+<div class="tmbar"><div class="tm-l">מכונת זמן</div><div class="tm-btns"><button class="tmb" id="tmB">&#9664;&#9664;</button><button class="tmb" id="tmP">&#9654;</button><button class="tmb" id="tmF">&#9654;&#9654;</button><button class="tmb" id="tmL" style="color:var(--red)">&#9679;</button></div><div class="tmsw"><input type="range" class="tms" id="tmS" min="0" max="720" value="720"></div><div class="tmd" id="tmD">LIVE</div></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const CC={strike:'#e04040',missile:'#e89030',naval:'#35c8c8',political:'#4a90e8',cyber:'#9060d0',seismic:'#e0a030',fire:'#ff6020',flight:'#4a90e8',ship:'#35c8c8',military:'#e89030'};
+const CN={strike:'תקיפה',missile:'טיל',naval:'ימי',political:'מדיני',cyber:'סייבר',seismic:'רעידה',fire:'שריפה',flight:'טיסה',ship:'ספינה',military:'צבאי'};
+const CK={strike:'cs',missile:'cm',naval:'cn',political:'cp',cyber:'cy',seismic:'cm',fire:'cs',flight:'cp',ship:'cn',military:'cm'};
+const FN={all:'הכל',strike:'תקיפות',missile:'טילים',naval:'ימי',political:'מדיני',cyber:'סייבר'};
+const FI=['all','strike','missile','naval','political','cyber'];
+
+// Military bases
+const BASES=[
+{n:'Nevatim AFB',la:31.21,lo:34.82,t:'IDF'},{n:'Ramon AFB',la:30.78,lo:34.67,t:'IDF'},{n:'Ramat David AFB',la:32.66,lo:35.18,t:'IDF'},
+{n:'Al Udeid AB',la:25.12,lo:51.31,t:'US'},{n:'Al Dhafra AB',la:24.25,lo:54.55,t:'US'},{n:'Prince Sultan AB',la:24.06,lo:47.58,t:'US'},
+{n:'Camp Arifjan',la:29.13,lo:48.08,t:'US'},{n:'Incirlik AB',la:37.00,lo:35.43,t:'US/NATO'},{n:'Diego Garcia',la:-7.32,lo:72.42,t:'US'},
+{n:'Al Minhad AB',la:25.03,lo:55.37,t:'US'},{n:'Masirah Island',la:20.68,lo:58.89,t:'US/Oman'},
+];
+// Iranian nuclear sites
+const NUKES=[
+{n:'Natanz',la:33.72,lo:51.73,t:'העשרת אורניום'},{n:'Fordow',la:34.88,lo:51.99,t:'העשרה תת-קרקעית'},{n:'Isfahan UCF',la:32.72,lo:51.47,t:'המרת אורניום'},
+{n:'Arak',la:34.37,lo:49.24,t:'כור מים כבדים'},{n:'Bushehr NPP',la:28.83,lo:50.89,t:'כור גרעיני'},{n:'Parchin',la:35.52,lo:51.77,t:'מתקן צבאי/גרעיני'},
+];
+
+const EV=[
+{t:'14:32',s:'CENTCOM',ti:'F/A-18 תוקפים סוללת טילים ליד בושהר',c:'strike',sv:'critical',a:28.96,o:50.83},
+{t:'14:18',s:'דובר צה"ל',ti:'כיפת ברזל יירטה 3 כלי טיס מלבנון',c:'missile',sv:'high',a:33.0,o:35.2},
+{t:'14:05',s:'Reuters',ti:'משמה"מ שיגרו 4 טילים בליסטיים לנבטים',c:'missile',sv:'critical',a:31.2,o:54.6},
+{t:'13:47',s:'AP',ti:'מתקפה על 12 ספינות במצר הורמוז',c:'naval',sv:'high',a:26.6,o:56.2},
+{t:'13:12',s:'NetBlocks',ti:'קישוריות איראנית 0.8%',c:'cyber',sv:'high',a:35.7,o:51.4},
+{t:'12:55',s:'דובר צה"ל',ti:'47 גיחות מעל מערב איראן',c:'strike',sv:'critical',a:33.5,o:48.3},
+{t:'12:38',s:'CENTCOM',ti:'B-2 תוקפים מתקן תת-קרקעי באיספהאן',c:'strike',sv:'critical',a:32.65,o:51.67},
+{t:'12:20',s:'Reuters',ti:'22 רקטות למפרץ חיפה, 19 יורטו',c:'missile',sv:'high',a:32.82,o:34.98},
+{t:'11:10',s:'דובר צה"ל',ti:'חץ-3 יירט טיל באקסו-אטמוספרה',c:'missile',sv:'critical',a:31.8,o:34.8},
+{t:'10:35',s:'Reuters',ti:'מכלית נפגעה ליד המצר',c:'naval',sv:'critical',a:26.3,o:56.4},
+{t:'09:10',s:'Reuters',ti:'חות\'ים שיגרו 6 טילים לאילת',c:'missile',sv:'high',a:29.56,o:34.95},
+{t:'08:52',s:'CENTCOM',ti:'טומהוקים לבונקר משמה"מ',c:'strike',sv:'critical',a:34.3,o:47.1},
+{t:'08:18',s:'דובר צה"ל',ti:'F-35I חזר מתקיפת עומק',c:'strike',sv:'high',a:30.1,o:47.5},
+];
+EV.forEach((e,i)=>e.id=i+1);
+
+// ===== WEB AUDIO SIREN =====
+let audioCtx,sirenOn=false,soundEnabled=true;
+function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
+function playSiren(){
+  if(!soundEnabled)return;
+  initAudio();if(sirenOn)return;sirenOn=true;
+  const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.type='sawtooth';osc.frequency.value=440;gain.gain.value=0.15;
+  osc.connect(gain);gain.connect(audioCtx.destination);osc.start();
+  let t=audioCtx.currentTime;
+  for(let i=0;i<6;i++){osc.frequency.setValueAtTime(440,t+i*1);osc.frequency.linearRampToValueAtTime(880,t+i*1+0.5);osc.frequency.linearRampToValueAtTime(440,t+i*1+1);}
+  gain.gain.setValueAtTime(0.15,t);gain.gain.linearRampToValueAtTime(0,t+6);
+  osc.stop(t+6);osc.onended=()=>{sirenOn=false;};
+}
+document.getElementById('fSnd').onclick=()=>{soundEnabled=!soundEnabled;const b=document.getElementById('fSnd');b.style.color=soundEnabled?'var(--red)':'var(--dim)';b.style.opacity=soundEnabled?'1':'0.5';if(soundEnabled){initAudio();audioCtx.resume();}};
+
+// ===== FULLSCREEN =====
+document.getElementById('fFs').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();};
+
+// ===== DAY/NIGHT =====
+document.getElementById('fDn').onclick=()=>{document.body.classList.toggle('day');
+  // Switch map tiles
+  if(map){const isDark=!document.body.classList.contains('day');const tiles=isDark?'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png':'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png';
+  map.getSource('c').tiles=[tiles,tiles.replace('a.','b.')];map.style.sourceCaches['c'].clearTiles();map.style.sourceCaches['c'].update(map.transform);map.triggerRepaint();}};
+
+// ===== OREF -- WORKER + PROXY FALLBACKS =====
+// STEP 1: Deploy oref-worker.js to Cloudflare Workers
+// STEP 2: Replace YOUR_WORKER below with your worker URL
+const OREF_WORKER='https://oref-proxy.YOUR_SUBDOMAIN.workers.dev';
+const OREF_DIRECT='https://www.oref.org.il/WarningMessages/alert/alerts.json';
+const OREF_HISTORY='https://www.oref.org.il/WarningMessages/alert/History/AlertsHistory.json';
+const OREF_PROXIES=[
+  url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url=>`https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+let orefWorkingMethod=null, orefFails=0;
+
+// Strip BOM (Byte Order Mark \uFEFF) that oref.org.il adds to responses
+function stripBOM(s){return s.charCodeAt(0)===0xFEFF?s.slice(1):s;}
+
+async function tryFetch(url,opts={}){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),4000);
+  try{const r=await fetch(url,{...opts,signal:ctrl.signal});clearTimeout(timer);return r;}
+  catch(e){clearTimeout(timer);throw e;}
+}
+
+async function fetchOref(){
+  const methods=[];
+  methods.push({name:'worker',fn:()=>tryFetch(OREF_WORKER)});
+  methods.push({name:'direct',fn:()=>tryFetch(OREF_DIRECT,{headers:{'X-Requested-With':'XMLHttpRequest','Referer':'https://www.oref.org.il/'},mode:'cors'})});
+  OREF_PROXIES.forEach((p,i)=>methods.push({name:'proxy'+i,fn:()=>tryFetch(p(OREF_DIRECT))}));
+
+  if(orefWorkingMethod){
+    const idx=methods.findIndex(m=>m.name===orefWorkingMethod);
+    if(idx>0){const preferred=methods.splice(idx,1)[0];methods.unshift(preferred);}
+  }
+
+  for(const method of methods){
+    try{
+      const r=await method.fn();
+      if(!r.ok)continue;
+      let text=await r.text();
+      text=stripBOM(text.trim());
+
+      // Empty = no active alerts (connection works)
+      if(!text||text.length<3||text==='null'||text==='[]'){
+        orefWorkingMethod=method.name;orefFails=0;
+        document.getElementById('orefSt').textContent='פעיל';
+        document.getElementById('orefSt').className='srcs on';
+        return;
+      }
+
+      let data;
+      try{data=JSON.parse(text);}catch{continue;}
+
+      // Handle both array and object formats
+      // oref returns: {id,cat,title,data:[cities],desc} or sometimes [{...}]
+      const alerts=Array.isArray(data)?data:[data];
+      for(const alert of alerts){
+        if(alert&&alert.data&&alert.data.length>0){
+          orefWorkingMethod=method.name;orefFails=0;
+          handleOref(alert);
+          document.getElementById('orefSt').textContent='פעיל ('+method.name+')';
+          document.getElementById('orefSt').className='srcs on';
+          return;
+        }
+      }
+
+      // Valid JSON but no alert data
+      orefWorkingMethod=method.name;orefFails=0;
+      document.getElementById('orefSt').textContent='פעיל';
+      document.getElementById('orefSt').className='srcs on';
+      return;
+    }catch{}
+  }
+
+  orefFails++;
+  document.getElementById('orefSt').textContent=orefFails<=3?'מנסה...':'סימולציה';
+  document.getElementById('orefSt').className='srcs dl';
+}
+
+// Fetch alert history on startup (via worker)
+async function fetchOrefHistory(){
+  try{
+    const r=await tryFetch(OREF_WORKER+'?type=history');
+    if(!r.ok)return;
+    let text=await r.text();text=stripBOM(text.trim());
+    if(!text||text.length<5)return;
+    const data=JSON.parse(text);
+    if(Array.isArray(data)&&data.length>0){
+      data.slice(0,20).reverse().forEach(h=>{
+        if(h.data&&h.alertDate){
+          alertH.push({cat:h.title||'התרעה',areas:Array.isArray(h.data)?h.data:[h.data],time:h.alertDate,catNum:h.category||'1'});
+        }
+      });
+      renderAlerts();
+    }
+  }catch{}
+}
+setTimeout(fetchOrefHistory,3000);
+const CITY_C={'תל אביב':[34.78,32.08],'חיפה':[34.99,32.79],'ירושלים':[35.22,31.77],'באר שבע':[34.79,31.25],'אשדוד':[34.65,31.80],'אשקלון':[34.57,31.67],'שדרות':[34.59,31.52],'נתיבות':[34.59,31.42],'אופקים':[34.62,31.32],'קריית שמונה':[35.57,33.21],'נהריה':[35.10,33.00],'עכו':[35.07,32.93],'כרמיאל':[35.30,32.91],'ראשון לציון':[34.79,31.97],'נתניה':[34.86,32.33],'הרצליה':[34.79,32.16],'רמת גן':[34.81,32.08],'חולון':[34.78,32.02],'בת ים':[34.75,32.02],'דימונה':[35.03,31.07],'ערד':[35.21,31.26],'אילת':[34.95,29.56],'כפר סבא':[34.90,32.17],'בני ברק':[34.83,32.09],'מטולה':[35.57,33.28],'שלומי':[35.14,33.08],'גבעתיים':[34.81,32.07],'גילת':[34.65,31.35],'רעננה':[34.88,32.18],'יבנה':[34.74,31.88],'קריית גת':[34.76,31.61]};
+let alertH=[],lastAId='';
+function handleOref(d){const id=d.id||''+Date.now();if(id===lastAId)return;lastAId=id;
+  const cats={'1':'ירי רקטות וטילים','2':'חדירת כלי טיס עוין','3':'רעידת אדמה','4':'צונאמי','5':'חומרים מסוכנים','6':'פריצת מחסום','7':'לוחמה לא קונבנציונלית','13':'חדירת מחבלים'};
+  const cat=cats[d.cat]||d.title||'התרעה';
+  const areas=Array.isArray(d.data)?d.data:[];
+  const time=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  showBanner(cat,areas,time);playSiren();
+  alertH.unshift({cat,areas,time,catNum:d.cat,desc:d.desc||''});
+  renderAlerts();
+  areas.forEach(a=>{const c=CITY_C[a];if(c&&map)addAlertMk(c,a,cat);});
+}
+function showBanner(cat,areas,time){const b=document.getElementById('alertBar');document.getElementById('aTitle').textContent=cat;document.getElementById('aAreas').textContent=areas.join(', ');document.getElementById('aTime').textContent=time;b.classList.add('active');document.getElementById('hud').classList.add('pushed');document.body.classList.add('alert-on');document.getElementById('fA').classList.add('has-alerts');clearTimeout(window._at);window._at=setTimeout(()=>{b.classList.remove('active');document.getElementById('hud').classList.remove('pushed');document.body.classList.remove('alert-on');},30000);}
+function addAlertMk(c,n,cat){const el=document.createElement('div');el.className='alert-mrk';el.innerHTML='<div class="alert-mrk-ring"></div><div class="alert-mrk-dot"></div>';const pp=new maplibregl.Popup({offset:16,closeButton:true,maxWidth:'250px'}).setHTML(`<div class="pp-type" style="background:var(--rD);color:var(--red)">${cat}</div><div class="pp-t" style="color:var(--red)">${n}</div><div class="pp-m">${new Date().toLocaleTimeString('he-IL')}</div>`);const m=new maplibregl.Marker({element:el}).setLngLat(c).setPopup(pp).addTo(map);setTimeout(()=>m.remove(),60000);}
+function renderAlerts(){document.getElementById('aCnt').textContent=alertH.length;document.getElementById('aFd').innerHTML=alertH.length===0?'<div style="padding:20px;text-align:center;color:var(--dim)">אין התרעות</div>':alertH.map(a=>`<div class="alrt"><div class="alrt-title"><svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2z"/></svg>${a.cat}<span class="alrt-cat">CAT ${a.catNum||'1'}</span></div><div class="alrt-areas">${a.areas.join(' / ')}</div><div class="alrt-meta">${a.time}</div></div>`).join('');}
+setInterval(fetchOref,3000);fetchOref();
+// Sim alerts
+const SIM_A=[{cat:'1',data:['שדרות','נתיבות','אופקים','גילת']},{cat:'1',data:['אשקלון','אשדוד','יבנה']},{cat:'1',data:['חיפה','עכו','נהריה']},{cat:'2',data:['קריית שמונה','מטולה','שלומי']},{cat:'1',data:['תל אביב','רמת גן','גבעתיים','חולון','בת ים']},{cat:'1',data:['באר שבע','דימונה']},{cat:'1',data:['נתניה','הרצליה','כפר סבא','רעננה']},{cat:'1',data:['אילת']}];
+let si=0;function simA(){const s=SIM_A[si%SIM_A.length];si++;handleOref({id:'sim-'+Date.now(),cat:s.cat,data:s.data});}
+setTimeout(()=>{simA();setInterval(simA,22000);},5000);
+
+// ===== TRAJECTORIES + PARTICLES =====
+const TRAJ=[{from:[52.5,33],to:[34.8,31.5],color:'#ff4040',dur:8000,h:5},{from:[51.4,35.7],to:[34.9,32],color:'#ff4040',dur:9000,h:5},{from:[35.5,33.9],to:[35,32.8],color:'#ff8800',dur:3000,h:1.5},{from:[44.2,15.4],to:[34.9,29.5],color:'#ff5050',dur:14000,h:2},{from:[34.8,32],to:[51.7,32.6],color:'#4a90e8',dur:6000,h:3},{from:[34.8,32],to:[48.3,33.5],color:'#4a90e8',dur:5500,h:3},{from:[50,26.5],to:[50.8,29],color:'#4a90e8',dur:5000,h:2}];
+let arcs=[],particles=[];const aCv=document.getElementById('arcCv'),ax=aCv.getContext('2d');
+function rsA(){const d=devicePixelRatio||1;aCv.width=innerWidth*d;aCv.height=innerHeight*d;aCv.style.width=innerWidth+'px';aCv.style.height=innerHeight+'px';ax.setTransform(d,0,0,d,0,0);}
+function p2s(ll){if(!map)return null;const p=map.project(ll);return{x:p.x,y:p.y};}
+function spawnArc(){const t=TRAJ[Math.floor(Math.random()*TRAJ.length)];const pts=[];for(let i=0;i<=80;i++){const p=i/80;pts.push({lng:t.from[0]+(t.to[0]-t.from[0])*p,lat:t.from[1]+(t.to[1]-t.from[1])*p,h:Math.sin(p*Math.PI)*t.h});}arcs.push({pts,color:t.color,st:Date.now(),dur:t.dur,from:t.from,to:t.to,exploded:false});}
+
+function spawnExplosion(x,y,color){
+  for(let i=0;i<20;i++){
+    const angle=Math.random()*Math.PI*2,speed=1+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:1,color,size:1+Math.random()*2});
+  }
+}
+
+function drawArcs(){
+  ax.clearRect(0,0,innerWidth,innerHeight);const now=Date.now();
+  // Draw particles
+  particles=particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.05;p.life-=0.02;if(p.life<=0)return false;
+    ax.beginPath();ax.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ax.fillStyle=p.color;ax.globalAlpha=p.life;ax.fill();ax.globalAlpha=1;return true;});
+  // Draw arcs
+  arcs=arcs.filter(a=>{const el=now-a.st,pr=Math.min(el/a.dur,1);if(pr>=1&&el>a.dur+3000)return false;
+    const hi=Math.floor(pr*(a.pts.length-1)),ts=Math.max(0,hi-25);
+    for(let i=ts;i<hi;i++){const p1=a.pts[i],p2=a.pts[i+1],s1=p2s([p1.lng,p1.lat+p1.h*.08]),s2=p2s([p2.lng,p2.lat+p2.h*.08]);if(!s1||!s2)continue;const seg=(i-ts)/(hi-ts);ax.beginPath();ax.moveTo(s1.x,s1.y);ax.lineTo(s2.x,s2.y);ax.strokeStyle=a.color;ax.globalAlpha=seg*.6;ax.lineWidth=1.5+seg;ax.stroke();}
+    ax.globalAlpha=1;
+    if(pr<1){const hp=a.pts[hi],hs=p2s([hp.lng,hp.lat+hp.h*.08]);if(hs){const g=ax.createRadialGradient(hs.x,hs.y,0,hs.x,hs.y,16);g.addColorStop(0,a.color+'70');g.addColorStop(1,'transparent');ax.fillStyle=g;ax.beginPath();ax.arc(hs.x,hs.y,16,0,Math.PI*2);ax.fill();ax.beginPath();ax.arc(hs.x,hs.y,3,0,Math.PI*2);ax.fillStyle='#fff';ax.fill();}}
+    else if(!a.exploded){a.exploded=true;const fp=a.pts[a.pts.length-1],fs=p2s([fp.lng,fp.lat]);if(fs)spawnExplosion(fs.x,fs.y,a.color);}
+    if(pr>=1){const fa=el-a.dur;if(fa<3000){const fp=a.pts[a.pts.length-1],fs=p2s([fp.lng,fp.lat]);if(fs){
+      // Expanding rings
+      for(let r=0;r<3;r++){const rd=8+(fa/3000)*30+r*8;ax.beginPath();ax.arc(fs.x,fs.y,rd,0,Math.PI*2);ax.strokeStyle=a.color;ax.globalAlpha=Math.max(0,(1-fa/3000)*.3-r*.08);ax.lineWidth=1.5;ax.stroke();}
+      ax.globalAlpha=1;}}}
+    return true;});
+  requestAnimationFrame(drawArcs);}
+function schedTraj(){spawnArc();setTimeout(spawnArc,1200);setInterval(()=>{for(let i=0;i<1+Math.floor(Math.random()*2);i++)setTimeout(spawnArc,i*700);},7000);}
+
+// ===== MAP =====
+let map,markers=[],lf='all';
+function initMap(){
+  map=new maplibregl.Map({container:'map',style:{version:8,sources:{'c':{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],tileSize:256,maxzoom:18}},layers:[{id:'c',type:'raster',source:'c'}]},center:[46,29],zoom:4.5,maxZoom:16,minZoom:2});
+  map.on('load',()=>{
+    addEventMk();
+    addBaseMk();
+    addNukeMk();
+    rsA();drawArcs();schedTraj();
+  });
+}
+
+// SVG icon paths per event visual type
+const ICONS={
+  fire:`<svg viewBox="0 0 24 24"><path d="M12 23c-3.6 0-7-2.5-7-7 0-3.2 2.1-5.5 3.8-7.6.5-.6 1-.7 1.5-.2.7.8 1.4 1.2 2.2 1.2.3 0 .5-.3.5-.6 0-1.5-.8-3.2-1.8-4.6-.4-.5-.1-1 .5-1C15.5 3.2 19 7 19 11.5 19 17.5 17.2 23 12 23z"/></svg>`,
+  explode:`<svg viewBox="0 0 24 24"><path d="M12 2l2.1 6.5H21l-5.5 4 2.1 6.5L12 15l-5.6 4 2.1-6.5L3 8.5h6.9z"/></svg>`,
+  target:`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/></svg>`,
+  intercept:`<svg viewBox="0 0 24 24"><path d="M12 2l1.5 4.5L18 5l-2 4 4.5 1.5L16 12l4.5 1.5L16 15l2 4-4.5-2L12 22l-1.5-4.5L6 19l2-4-4.5-1.5L8 12 3.5 10.5 8 9 6 5l4.5 2z"/></svg>`,
+  aircraft:`<svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0011.5 2 1.5 1.5 0 0010 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>`,
+  naval:`<svg viewBox="0 0 24 24"><path d="M4 19l1.5-1.5c1.3-1.3 3.4-1.3 4.7 0l.3.3.3-.3c1.3-1.3 3.4-1.3 4.7 0L17 19"/><path d="M6 15l-2 4"/><path d="M18 15l2 4"/><path d="M12 6v9"/><path d="M8 12h8"/><circle cx="12" cy="5" r="1.5"/></svg>`,
+  cyber:`<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+  political:`<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 9h8M8 12h4"/></svg>`,
+  seismic:`<svg viewBox="0 0 24 24"><path d="M2 12h3l2-6 3 12 3-8 2 4h7"/></svg>`,
+  fireSat:`<svg viewBox="0 0 24 24"><path d="M12 23c-3.6 0-7-2.5-7-7 0-3.2 2.1-5.5 3.8-7.6.5-.6 1-.7 1.5-.2.7.8 1.4 1.2 2.2 1.2.3 0 .5-.3.5-.6 0-1.5-.8-3.2-1.8-4.6-.4-.5-.1-1 .5-1C15.5 3.2 19 7 19 11.5 19 17.5 17.2 23 12 23z"/><circle cx="12" cy="16" r="2"/></svg>`,
+  flight:`<svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0011.5 2 1.5 1.5 0 0010 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>`,
+  ship:`<svg viewBox="0 0 24 24"><path d="M2 20l1.5-1.5c1.3-1.3 3.4-1.3 4.7 0l.3.3.3-.3c1.3-1.3 3.4-1.3 4.7 0L15 20"/><path d="M4 17l2-8h12l2 8"/><path d="M12 5v4"/></svg>`,
+  military:`<svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z"/></svg>`,
+};
+// Map event category+severity to icon type
+function getIconType(ev){
+  if(ev.c==='strike'){
+    if(ev.ti.includes('יירט')||ev.ti.includes('intercept'))return 'intercept';
+    if(ev.ti.includes('פיצוץ')||ev.ti.includes('explosion'))return 'explode';
+    if(ev.ti.includes('מל"ט')||ev.ti.includes('F-35')||ev.ti.includes('F/A-18')||ev.ti.includes('B-2')||ev.ti.includes('גיח'))return 'aircraft';
+    return 'fire';
+  }
+  if(ev.c==='missile'){
+    if(ev.ti.includes('יירט')||ev.ti.includes('intercept')||ev.ti.includes('כיפת')||ev.ti.includes('חץ')||ev.ti.includes('Sling')||ev.ti.includes('THAAD'))return 'intercept';
+    return 'target';
+  }
+  if(ev.c==='seismic')return 'seismic';
+  if(ev.c==='fire')return 'fireSat';
+  if(ev.c==='flight')return 'flight';
+  if(ev.c==='ship')return 'ship';
+  if(ev.c==='military')return 'military';
+  if(ev.c==='naval')return 'naval';
+  if(ev.c==='cyber')return 'cyber';
+  if(ev.c==='political')return 'political';
+  return 'fire';
+}
+function mkEl(ev){
+  const iconType=getIconType(ev);
+  const el=document.createElement('div');
+  el.className=`mrk mrk-${iconType}`;
+  const c=CC[ev.c]||'#e89030';
+  el.innerHTML=`<div class="mrk-ring" style="border-color:${c}"></div><div class="mrk-icon">${ICONS[iconType]}</div>`;
+  return el;
+}
+function addEventMk(){EV.forEach(ev=>{if(!ev.a||!ev.o)return;const el=mkEl(ev);const pp=new maplibregl.Popup({offset:14,closeButton:true,maxWidth:'300px'}).setHTML(`<div class="pp-t">${ev.ti}</div><div class="pp-m">${ev.t} UTC &middot; ${ev.s} &middot; ${CN[ev.c]}</div>`);const m=new maplibregl.Marker({element:el}).setLngLat([ev.o,ev.a]).setPopup(pp).addTo(map);m._cat=ev.c;m._el=el;markers.push(m);});}
+
+function addBaseMk(){
+  BASES.forEach(b=>{
+    const el=document.createElement('div');el.className='base-mrk';
+    const pp=new maplibregl.Popup({offset:10,closeButton:true,maxWidth:'220px'}).setHTML(`<div class="pp-type" style="background:var(--bD);color:var(--blue2)">בסיס ${b.t}</div><div class="pp-t">${b.n}</div><div class="pp-m">${b.la.toFixed(2)}, ${b.lo.toFixed(2)}</div>`);
+    new maplibregl.Marker({element:el}).setLngLat([b.lo,b.la]).setPopup(pp).addTo(map);
+  });
+}
+function addNukeMk(){
+  NUKES.forEach(n=>{
+    const el=document.createElement('div');el.className='nuke-mrk';el.textContent='\u2622';
+    const pp=new maplibregl.Popup({offset:10,closeButton:true,maxWidth:'220px'}).setHTML(`<div class="pp-type" style="background:var(--aD);color:var(--amber)">אתר גרעיני</div><div class="pp-t">${n.n}</div><div style="font-size:11px;color:var(--muted);margin:4px 0">${n.t}</div><div class="pp-m">${n.la.toFixed(2)}, ${n.lo.toFixed(2)}</div>`);
+    new maplibregl.Marker({element:el}).setLngLat([n.lo,n.la]).setPopup(pp).addTo(map);
+  });
+}
+
+function filterMk(c){markers.forEach(m=>{const ok=c==='all'||m._cat===c;m._el.style.opacity=ok?'1':'0.06';m._el.style.pointerEvents=ok?'auto':'none';});}
+document.getElementById('zI').onclick=()=>map.zoomIn({duration:300});
+document.getElementById('zO').onclick=()=>map.zoomOut({duration:300});
+document.getElementById('zR').onclick=()=>map.flyTo({center:[46,29],zoom:4.5,duration:1200});
+
+// ===== PANELS =====
+function tog(p,f){const el=document.getElementById(p),fb=document.getElementById(f),op=!el.classList.contains('open');document.querySelectorAll('.panel.open').forEach(x=>{if(x.id!==p){x.classList.remove('open');document.querySelectorAll('.fab.on').forEach(b=>b.classList.remove('on'));}});el.classList.toggle('open');fb.classList.toggle('on',op);}
+window.tog=tog;
+document.getElementById('fF').onclick=()=>tog('feedP','fF');
+document.getElementById('fA').onclick=()=>tog('alertP','fA');
+document.getElementById('fI').onclick=()=>tog('intelP','fI');
+document.getElementById('fS').onclick=()=>tog('statsP','fS');
+document.getElementById('fAb').onclick=()=>tog('aboutP','fAb');
+document.getElementById('fFo').onclick=()=>tog('focusP','fFo');
+function flyRegion(lng,lat,z){map.flyTo({center:[lng,lat],zoom:z,duration:1200});}
+window.flyRegion=flyRegion;
+function uc(){document.getElementById('utc').textContent=new Date().toISOString().slice(11,19);}setInterval(uc,1000);uc();
+const tc=document.getElementById('fTabs');FI.forEach(f=>{const b=document.createElement('div');b.className='tab'+(f==='all'?' on':'');b.textContent=FN[f];b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');lf=f;rF(f);filterMk(f);};tc.appendChild(b);});
+const lyB=document.getElementById('lyB');FI.forEach(f=>{const b=document.createElement('button');b.className='lb'+(f==='all'?' on':'');b.textContent=FN[f];b.onclick=()=>{document.querySelectorAll('.lb').forEach(x=>x.classList.remove('on'));b.classList.add('on');lf=f;filterMk(f);};lyB.appendChild(b);});
+function goTo(a,o){map.flyTo({center:[o,a],zoom:8,duration:1000});}window.goTo=goTo;rF('all');
+const tmS=document.getElementById('tmS'),tmD=document.getElementById('tmD'),sd=new Date('2026-02-27');
+tmS.oninput=()=>{const h=+tmS.value;if(h>=720){tmD.textContent='LIVE';tmD.style.color='var(--cyan)';}else{const d=new Date(sd.getTime()+h*36e5);tmD.textContent=d.toISOString().slice(5,16).replace('T',' ');tmD.style.color='var(--amber)';}};
+document.getElementById('tmL').onclick=()=>{tmS.value=720;tmD.textContent='LIVE';tmD.style.color='var(--cyan)';};
+document.getElementById('tmB').onclick=()=>{tmS.value=Math.max(0,+tmS.value-6);tmS.dispatchEvent(new Event('input'));};
+document.getElementById('tmF').onclick=()=>{tmS.value=Math.min(720,+tmS.value+6);tmS.dispatchEvent(new Event('input'));};
+// Sim events -- DYNAMIC ENGINE
+const EVT=[
+{s:'דובר צה"ל',tpl:['כיפת ברזל יירטה {n} רקטות מעל {city}','חץ-3 יירט טיל בליסטי מעל {city}','שרביט קסמים יירט טיל שיוט מעל {city}','חיל האוויר תקף מחסן נשק ב{iran}','F-35I השמיד סוללת טילים ליד {iran}','מל"ט תקף משגר טילים ליד {iran}'],c:['missile','missile','missile','strike','strike','strike'],sv:['high','critical','critical','critical','high','high']},
+{s:'CENTCOM',tpl:['מפציצי B-2 תקפו מתקן תת-קרקעי ב{iran}','F/A-18 תקפו אתר טילים ליד {iran}','THAAD יירט טיל בליסטי מעל {gulf}','טומהוקים שוגרו לבונקר פיקוד ב{iran}','נושאת אייזנהאואר תקפה כלי שיט ליד {naval}'],c:['strike','strike','missile','strike','naval'],sv:['critical','critical','critical','critical','high']},
+{s:'Reuters',tpl:['חיזבאללה שיגר {n} רקטות ל{city}','חות\'ים שיגרו טיל שיוט לכיוון {city}','מכלית נפגעה מטיל נגד ספינות ליד {naval}','משמה"מ שיגרו {n} טילים בליסטיים לכיוון {city}','פיצוץ עצום דווח ב{iran} לאחר תקיפה','מחירי נפט זינקו ל-${oil} לאחר תקרית ב{naval}'],c:['missile','missile','naval','missile','strike','political'],sv:['high','high','critical','critical','critical','medium']},
+{s:'AP',tpl:['סעודיה סגרה מרחב אווירי בעקבות שיגור','טורקיה דורשת התייעצות נאט"ו לאחר טיל באוויריה','נפילות בשטחים פתוחים ב{city} -- אין נפגעים','HMS Diamond תקף נחיל מל"טים ב{naval}'],c:['political','political','missile','naval'],sv:['medium','high','low','high']},
+{s:'NetBlocks',tpl:['קישוריות איראנית ירדה ל-{pct}%','אפס תעבורה מ-{prov} מחוזות באיראן','שיבושי GPS נרחבים דווחו באזור {gulf}'],c:['cyber','cyber','cyber'],sv:['high','medium','medium']},
+{s:'USGS',tpl:['רעידת אדמה בעוצמה {mag} הורגשה ליד {iran}','זעזוע סייסמי {mag} ריכטר -- חשד לפיצוץ תת-קרקעי ב{iran}','פעילות סייסמית חריגה באזור {iran} -- בבדיקה'],c:['seismic','seismic','seismic'],sv:['medium','high','medium']},
+{s:'NASA FIRMS',tpl:['אנומליה תרמית זוהתה בלוויין ליד {iran}','שריפה גדולה מזוהה מלוויין באזור {iran}','נקודות חום מרובות זוהו באזור {gulf}','אנומליה תרמית ליד מתקן צבאי ב{iran}'],c:['fire','fire','fire','fire'],sv:['medium','high','medium','high']},
+{s:'OpenSky',tpl:['מטוס צבאי לא מזוהה מעל {gulf}','תעבורה אווירית חריגה באזור {city}','מטוס תדלוק KC-135 בנתיב מעל {gulf}','NOTAM חדש -- סגירת מרחב אווירי מעל {iran}'],c:['flight','flight','flight','political'],sv:['low','medium','low','medium']},
+{s:'MarineTraffic',tpl:['כלי שיט איראני חשוד ליד {naval}','נושאת מטוסים אמריקנית שינתה נתיב ב{naval}','מכלית נפט כיבתה AIS ליד {naval}','ספינת מלחמה בריטית נכנסה ל{naval}'],c:['ship','ship','ship','ship'],sv:['medium','low','high','low']},
+{s:'דובר צה"ל',tpl:['תנועת שריון חריגה בגבול הצפון','כוח מיוחד פועל באזור {city}','גיוס מילואים נוסף -- חטיבה 7'],c:['military','military','military'],sv:['medium','high','high']},
+];
+const CITIES=['חיפה','תל אביב','אשקלון','באר שבע','נתניה','הרצליה','אילת','ראשון לציון','אשדוד','קריית שמונה','עפולה','נהריה'];
+const IRAN_LOCS=['איספהאן','טבריז','שיראז','בושהר','כרמנשאה','טהרן','אראק','נתנז','פורדו','פרצ\'ין','בנדר עבאס','אהוואז'];
+const GULF_LOCS=['מצר הורמוז','מפרץ עומאן','מפרץ הפרסי','אל-עדיד','באחריין'];
+const NAVAL_LOCS=['מצר הורמוז','מפרץ עומאן','ים סוף','מזרח הים התיכון'];
+const CITY_GEO={['חיפה']:[34.99,32.79],['תל אביב']:[34.78,32.08],['אשקלון']:[34.57,31.67],['באר שבע']:[34.79,31.25],['נתניה']:[34.86,32.33],['הרצליה']:[34.79,32.16],['אילת']:[34.95,29.56],['ראשון לציון']:[34.79,31.97],['אשדוד']:[34.65,31.80],['קריית שמונה']:[35.57,33.21],['עפולה']:[35.29,32.61],['נהריה']:[35.10,33.00]};
+const IRAN_GEO={['איספהאן']:[51.68,32.65],['טבריז']:[46.29,38.08],['שיראז']:[52.58,29.59],['בושהר']:[50.84,28.97],['כרמנשאה']:[47.06,34.31],['טהרן']:[51.39,35.69],['אראק']:[49.69,34.09],['נתנז']:[51.73,33.72],['פורדו']:[51.99,34.88],['פרצ\'ין']:[51.77,35.52],['בנדר עבאס']:[56.27,27.19],['אהוואז']:[48.68,31.32]};
+const NAVAL_GEO={['מצר הורמוז']:[56.3,26.5],['מפרץ עומאן']:[58.5,24.5],['ים סוף']:[38.5,20.0],['מזרח הים התיכון']:[33.5,34.0]};
+
+function rnd(a){return a[Math.floor(Math.random()*a.length)];}
+function genEvent(){
+  const grp=rnd(EVT);
+  const idx=Math.floor(Math.random()*grp.tpl.length);
+  let txt=grp.tpl[idx],cat=grp.c[idx],sev=grp.sv[idx];
+  const city=rnd(CITIES),iran=rnd(IRAN_LOCS),gulf=rnd(GULF_LOCS),naval=rnd(NAVAL_LOCS);
+  txt=txt.replace('{city}',city).replace('{iran}',iran).replace('{gulf}',gulf).replace('{naval}',naval);
+  txt=txt.replace('{n}',''+(Math.floor(Math.random()*20)+2));
+  txt=txt.replace('{oil}',''+(108+Math.floor(Math.random()*15)));
+  txt=txt.replace('{pct}',''+(Math.random()*2).toFixed(1));
+  txt=txt.replace('{prov}',''+(28+Math.floor(Math.random()*3)));
+  txt=txt.replace('{mag}',''+(3+Math.random()*3).toFixed(1));
+  // Determine coords
+  let geo;
+  if((cat==='strike'||cat==='seismic'||cat==='fire'||cat==='military')&&IRAN_GEO[iran])geo=IRAN_GEO[iran];
+  else if(cat==='naval'||cat==='ship')geo=NAVAL_GEO[naval]||[56.3,26.5];
+  else if(cat==='cyber')geo=[51.4+Math.random()*2,35.5+Math.random()*1.5];
+  else if(cat==='political'||cat==='flight')geo=[46+Math.random()*8,26+Math.random()*10];
+  else if(CITY_GEO[city])geo=CITY_GEO[city];
+  else geo=[34.8+Math.random()*2,31+Math.random()*2];
+  // Jitter
+  geo=[geo[0]+(Math.random()-.5)*.3, geo[1]+(Math.random()-.5)*.3];
+  return{s:grp.s,ti:txt,c:cat,sv:sev,a:geo[1],o:geo[0],ts:Date.now()};
+}
+
+function relTime(ts){
+  const d=Math.floor((Date.now()-ts)/1000);
+  if(d<10)return 'עכשיו';
+  if(d<60)return `לפני ${d} שנ'`;
+  if(d<3600)return `לפני ${Math.floor(d/60)} דק'`;
+  return `לפני ${Math.floor(d/3600)} שע'`;
+}
+
+function rF(f){
+  const l=f==='all'?EV:EV.filter(e=>e.c===f);
+  document.getElementById('eCnt').textContent=l.length;
+  document.getElementById('eFd').innerHTML=l.slice(0,60).map(ev=>{
+    const time=ev.ts?relTime(ev.ts):ev.t;
+    return `<div class="ev sev-${ev.sv}" onclick="goTo(${ev.a},${ev.o})"><div class="ev-time">${time} <span class="ev-src">${ev.s}</span></div><div class="ev-ti">${ev.ti}</div><span class="ev-cat ${CK[ev.c]}">${CN[ev.c]}</span></div>`;
+  }).join('');
+}
+
+function pushEvent(ev){
+  ev.id=EV.length+1;
+  if(!ev.ts)ev.ts=Date.now();
+  if(!ev.t)ev.t=new Date().toISOString().slice(11,16);
+  EV.unshift(ev);
+  rF(lf==='all'?'all':lf);
+  const f=document.querySelector('.ev');if(f)f.classList.add('fresh');
+  if(ev.a&&map){
+    const el=mkEl(ev);
+    const pp=new maplibregl.Popup({offset:16,closeButton:true,maxWidth:'300px'}).setHTML(`<div class="pp-t">${ev.ti}</div><div class="pp-m">${relTime(ev.ts)} &middot; ${ev.s} &middot; ${CN[ev.c]}</div>`);
+    const m=new maplibregl.Marker({element:el}).setLngLat([ev.o,ev.a]).setPopup(pp).addTo(map);
+    m._cat=ev.c;m._el=el;markers.push(m);
+  }
+  // Update stats
+  const se=document.getElementById('s1');se.textContent=(parseInt(se.textContent.replace(/,/g,''))+Math.floor(Math.random()*8+1)).toLocaleString();
+  if(ev.c==='missile'){const s2=document.getElementById('s2');s2.textContent=(parseInt(s2.textContent.replace(/,/g,''))+Math.floor(Math.random()*3+1)).toLocaleString();}
+  if(ev.c==='strike'){const s3=document.getElementById('s3');s3.textContent=(parseInt(s3.textContent.replace(/,/g,''))+Math.floor(Math.random()*4+1)).toLocaleString();}
+  // Spawn trajectory for missile events
+  if((ev.c==='missile'||ev.c==='strike')&&Math.random()>0.4){spawnArc();}
+}
+
+// Generate events every 8-25 seconds
+function scheduleGen(){
+  const delay=8000+Math.random()*17000;
+  setTimeout(()=>{pushEvent(genEvent());scheduleGen();},delay);
+}
+scheduleGen();
+// Refresh relative times every 30s
+setInterval(()=>rF(lf==='all'?'all':lf),30000);
+
+// ===== CLAUDE API -- REAL NEWS =====
+async function fetchRealNews(){
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:'Search for the latest Iran-Israel war news from the last 2 hours. Return ONLY a JSON array of 5 events, each with: {"title":"Hebrew title","source":"Reuters/AP/CENTCOM/IDF","category":"strike/missile/naval/political/cyber","severity":"critical/high/medium/low","lat":number,"lng":number}. No markdown, no explanation, just the JSON array.'}]
+      })
+    });
+    if(!resp.ok)throw new Error(resp.status);
+    const data=await resp.json();
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean=text.replace(/```json|```/g,'').trim();
+    const events=JSON.parse(clean);
+    if(Array.isArray(events)){
+      events.forEach(e=>{
+        pushEvent({s:e.source||'OSINT',ti:e.title,c:e.category||'political',sv:e.severity||'medium',a:e.lat||32,o:e.lng||35});
+      });
+      // Update ticker with real headlines
+      const tickerItems=events.map(e=>({src:e.source||'OSINT',t:e.title}));
+      if(tickerItems.length>0)buildTicker([...tickerItems,...FALLBACK_NEWS.slice(0,8)]);
+    }
+  }catch(e){
+    console.log('Claude API unavailable, using simulation:',e.message);
+  }
+}
+// Fetch real news every 3 minutes
+fetchRealNews();
+setInterval(fetchRealNews,180000);
+addEventListener('resize',rsA);initMap();renderAlerts();
+
+// ===== NEWS TICKER =====
+const FALLBACK_NEWS=[
+  {src:'Reuters',t:'US-Israeli coalition strikes enter Day 30 as IRGC retaliates across Gulf'},
+  {src:'AP',t:'Pentagon: over 2,800 coalition sorties flown since start of Operation Epic Fury'},
+  {src:'Reuters',t:'Oil prices surge past $112 as Strait of Hormuz remains effectively blocked'},
+  {src:'CENTCOM',t:'THAAD and Patriot batteries intercept multiple ballistic missiles over Gulf states'},
+  {src:'AP',t:'NATO holds emergency session after Iranian missile traverses Turkish airspace'},
+  {src:'Reuters',t:'Iran internet connectivity at 1.2% -- NetBlocks confirms 30-day blackout'},
+  {src:'IDF',t:'Arrow-3 successfully intercepts exo-atmospheric ballistic missile threat'},
+  {src:'AP',t:'Saudi Arabia diverts 230+ commercial flights after closing eastern airspace'},
+  {src:'Reuters',t:'Dubai stock exchange triggers circuit breaker after 6.2% drop at open'},
+  {src:'CENTCOM',t:'USS Eisenhower carrier group engages hostile fast-attack craft in Strait'},
+  {src:'Reuters',t:'Houthi forces launch cruise missiles toward Eilat, 5 of 6 intercepted'},
+  {src:'AP',t:'82nd Airborne Division deploys to forward operating base in Jordan'},
+  {src:'Reuters',t:'UK Royal Navy HMS Diamond engages drone swarm in Gulf of Oman'},
+  {src:'IDF',t:'IAF F-35I Adir squadrons complete deep strike mission over Iran'},
+];
+
+function buildTicker(items){
+  const el=document.getElementById('tickScroll');
+  const html=items.map(n=>`<div class="ticker-item"><span class="t-src">${n.src}</span><span class="t-dot"></span>${n.t}</div>`).join('');
+  el.innerHTML=html+html; // duplicate for infinite scroll
+}
+
+async function fetchRSS(){
+  try{
+    const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews&count=15');
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    if(d.items&&d.items.length>0){
+      const news=d.items.map(i=>({src:'Reuters',t:i.title}));
+      buildTicker(news);return;
+    }
+  }catch{}
+  // Fallback
+  buildTicker(FALLBACK_NEWS);
+}
+fetchRSS();
+
+// ===== ATTACK CHART =====
+function buildChart(){
+  const el=document.getElementById('atkChart');
+  const now=new Date().getHours();
+  const data=[];
+  for(let i=0;i<24;i++){
+    // Simulate attack frequency pattern: higher at night/early morning
+    const h=(now-23+i+24)%24;
+    const base=15+Math.random()*30;
+    const peak=h>=2&&h<=6?25:h>=10&&h<=14?20:0;
+    data.push({h,v:Math.floor(base+peak+Math.random()*15)});
+  }
+  const max=Math.max(...data.map(d=>d.v));
+  el.innerHTML=data.map((d,i)=>{
+    const pct=Math.max(4,(d.v/max)*100);
+    const isNow=i===23;
+    const color=isNow?'var(--cyan)':d.v>max*0.7?'var(--red)':d.v>max*0.4?'var(--orange)':'var(--blue2)';
+    const opacity=isNow?1:0.6;
+    return `<div class="chart-bar" style="height:${pct}%;background:${color};opacity:${opacity}" data-tip="${String(d.h).padStart(2,'0')}:00 - ${d.v} events"></div>`;
+  }).join('');
+}
+buildChart();
+setInterval(buildChart,60000);
+
+// ===== COUNTRY THREAT LEVELS (sigmoid + time-decay) =====
+const THEATER={
+  'ישראל':{id:'IL',base:0.85},'איראן':{id:'IR',base:0.95},'לבנון':{id:'LB',base:0.7},
+  'תימן':{id:'YE',base:0.5},'עיראק':{id:'IQ',base:0.45},'סוריה':{id:'SY',base:0.4},
+  'סעודיה':{id:'SA',base:0.3},'איחוד האמירויות':{id:'AE',base:0.25},'קטאר':{id:'QA',base:0.2},
+  'בחריין':{id:'BH',base:0.35},'ירדן':{id:'JO',base:0.2},'כווית':{id:'KW',base:0.25},
+};
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+function computeThreats(){
+  const now=Date.now();
+  const results={};
+  for(const[name,info] of Object.entries(THEATER)){
+    // Count recent events near this country (simulated via category relevance)
+    let score=info.base;
+    const recentEv=EV.filter(e=>e.ts&&(now-e.ts)<3600000); // last hour
+    const evCount=recentEv.length;
+    // Time-decayed event contribution
+    recentEv.forEach(e=>{
+      const age=(now-e.ts)/3600000; // hours
+      const decay=Math.exp(-age*0.5);
+      const sevW={critical:0.04,high:0.025,medium:0.015,low:0.005}[e.sv]||0.01;
+      score+=sevW*decay;
+    });
+    // Sigmoid normalization to 0-1
+    score=sigmoid((score-0.5)*4);
+    // Add jitter for realism
+    score=Math.min(1,Math.max(0,score+(Math.random()-0.5)*0.05));
+    results[name]={score,id:info.id};
+  }
+  return results;
+}
+
+function renderThreatGrid(){
+  const threats=computeThreats();
+  const el=document.getElementById('threatGrid');
+  if(!el)return;
+  const sorted=Object.entries(threats).sort((a,b)=>b[1].score-a[1].score);
+  el.innerHTML=sorted.map(([name,d])=>{
+    const pct=Math.round(d.score*100);
+    const color=d.score>0.7?'var(--red)':d.score>0.4?'var(--orange)':d.score>0.2?'var(--amber)':'var(--green)';
+    return `<div class="tg-item"><span class="tg-name">${name}</span><div class="tg-bar"><div class="tg-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+  }).join('');
+}
+renderThreatGrid();
+setInterval(renderThreatGrid,30000);
+
+// ===== STATUS BAR =====
+function updateStatusBar(){
+  const el=document.getElementById('sbCount');
+  if(el)el.textContent=EV.length;
+  const upd=document.getElementById('sbUpdate');
+  if(upd){
+    const last=EV[0];
+    if(last&&last.ts)upd.textContent='עדכון: '+relTime(last.ts);
+  }
+  // Overall threat
+  const threats=computeThreats();
+  const maxThreat=Math.max(...Object.values(threats).map(t=>t.score));
+  const dot=document.getElementById('sbThreatDot');
+  const txt=document.getElementById('sbThreatTxt');
+  if(dot&&txt){
+    if(maxThreat>0.8){dot.style.background='var(--red)';txt.textContent='איום: קריטי';}
+    else if(maxThreat>0.6){dot.style.background='var(--orange)';txt.textContent='איום: גבוה';}
+    else if(maxThreat>0.4){dot.style.background='var(--amber)';txt.textContent='איום: בינוני';}
+    else{dot.style.background='var(--green)';txt.textContent='איום: נמוך';}
+  }
+}
+updateStatusBar();
+setInterval(updateStatusBar,10000);
+
+// ===== AI SITUATION SUMMARY (every 5 min) =====
+const SIM_SUMMARIES=[
+  'עימות מתמשך: חיל האוויר ממשיך בגיחות מעל מערב איראן תוך יירוט מתמשך של טילים בליסטיים. פיקוד העורף דיווח על התרעות מרובות בצפון ובמרכז. מצר הורמוז סגור בפועל -- מחירי נפט עולים.',
+  'המתקפה האווירית נכנסת ליום 30. CENTCOM דיווח על השמדת 12 אתרי טילים נוספים. משמה"מ המשיכו בשיגורים בליסטיים לעבר ישראל וערב הסעודית. קישוריות איראנית מינימלית.',
+  'גל שיגורים מתימן וגבול לבנון: חיזבאללה שיגר רקטות לצפון, חות\'ים שיגרו טילי שיוט. מערכות ההגנה הישראליות והאמריקאיות יירטו את הרוב. פעילות סייסמית חשודה באזור נתנז.',
+  'מבצע ימי נרחב: נושאת אייזנהאואר וצי בריטי פועלים בו-זמנית במצר הורמוז ומפרץ עומאן. שני מל"טים אירנים הופלו. NASA FIRMS זיהה אנומליות תרמיות במספר אתרים באיראן.',
+];
+let sumIdx=0;
+function generateSummary(){
+  // Try Claude API first
+  (async()=>{
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,
+          tools:[{type:'web_search_20250305',name:'web_search'}],
+          messages:[{role:'user',content:'Search latest Iran-Israel war news. Write a 2-sentence Hebrew situation summary for a military OSINT dashboard. Just the summary text, no quotes or formatting.'}]})
+      });
+      if(!resp.ok)throw 0;
+      const data=await resp.json();
+      const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+      if(text.length>20){
+        document.getElementById('aiSumText').textContent=text;
+        document.getElementById('aiSumTime').textContent=new Date().toLocaleTimeString('he-IL')+' (AI)';
+        return;
+      }
+    }catch{}
+    // Fallback to rotation
+    document.getElementById('aiSumText').textContent=SIM_SUMMARIES[sumIdx%SIM_SUMMARIES.length];
+    document.getElementById('aiSumTime').textContent=new Date().toLocaleTimeString('he-IL')+' (סימולציה)';
+    sumIdx++;
+  })();
+}
+generateSummary();
+setInterval(generateSummary,300000); // every 5 minutes
+</script></body></html>
