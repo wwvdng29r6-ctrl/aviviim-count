@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>מרכז פיקוד — אביבים</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#05080e;
+  --s1:#0a0f1a;
+  --s2:#101826;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.13);
+  --text:#d8e8f5;
+  --muted:#6a90b0;
+  --dim:#3a6080;
+  --accent:#2d72c8;
+  --accent2:#4a9fe8;
+  --green:#1db954;
+  --green-dim:rgba(29,185,84,0.12);
+  --green-border:rgba(29,185,84,0.30);
+  --amber:#e09b35;
+  --red:#e04040;
+  --gold:#c8a84b;
+}
+html,body{min-height:100%;font-family:'Heebo',sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+body{
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(45,114,200,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(29,185,84,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 60% at 50% 50%, rgba(45,114,200,0.05) 0%, transparent 70%),
+    linear-gradient(160deg, #05080e 0%, #060a14 50%, #040710 100%);
+  background-attachment: fixed;
+}
+
+/* ━━━ GRID NOISE OVERLAY ━━━ */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 100% 100% at 50% 0%, black 40%, transparent 100%);
+}
+
+/* ━━━ SCANLINES ━━━ */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+}
+
+.wrap{position:relative;z-index:2;min-height:100dvh;display:flex;flex-direction:column;padding-bottom:60px;}
+
+/* ━━━ HERO ━━━ */
+.hero{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 24px 60px;text-align:center;overflow:hidden;
+}
+.hero-glow{
+  position:absolute;top:-120px;left:50%;transform:translateX(-50%);
+  width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle, rgba(45,114,200,0.20) 0%, transparent 70%);
+  pointer-events:none;animation:pulse-glow 4s ease-in-out infinite;
+}
+@keyframes pulse-glow{0%,100%{transform:translateX(-50%) scale(1);opacity:.7;}50%{transform:translateX(-50%) scale(1.08);opacity:1;}}
+
+.badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(45,114,200,0.12);border:1px solid rgba(45,114,200,0.30);
+  border-radius:100px;padding:6px 18px;font-size:11px;font-weight:700;
+  color:var(--accent2);letter-spacing:.8px;text-transform:uppercase;
+  margin-bottom:28px;
+  animation:fade-down .6s ease both;
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+.hero-title{
+  font-size:clamp(36px,8vw,80px);font-weight:900;line-height:1.05;
+  letter-spacing:-1px;
+  background:linear-gradient(135deg,#d8e8f5 0%,#a0c8f0 40%,#6aa8e0 70%,#4a9fe8 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:8px;
+  animation:fade-down .7s .1s ease both;
+}
+.hero-sub{
+  font-size:clamp(16px,3vw,22px);font-weight:300;color:var(--muted);
+  margin-bottom:40px;letter-spacing:.3px;
+  animation:fade-down .7s .2s ease both;
+}
+.hero-sub strong{color:var(--text);font-weight:600;}
+
+/* CLOCK WIDGET */
+.clock-widget{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border2);
+  border-radius:20px;padding:18px 36px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  animation:fade-up .7s .3s ease both;
+}
+.clock-time{font-size:clamp(32px,6vw,56px);font-weight:700;letter-spacing:4px;color:#fff;font-variant-numeric:tabular-nums;}
+.clock-date{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:1px;}
+.clock-status{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--green);margin-top:2px;}
+
+@keyframes fade-down{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fade-up{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+
+/* ━━━ STATS BAR ━━━ */
+.stats-bar{
+  display:flex;align-items:stretch;gap:1px;
+  background:var(--border);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  margin-bottom:48px;overflow:hidden;
+  animation:fade-up .7s .4s ease both;
+}
+.stat{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px 16px;background:var(--s1);gap:4px;transition:background .2s;
+  min-width:0;
+}
+.stat:hover{background:var(--s2);}
+.stat-val{font-size:clamp(20px,4vw,32px);font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1;}
+.stat-val.green{color:var(--green);}
+.stat-val.amber{color:var(--amber);}
+.stat-val.red{color:var(--red);}
+.stat-lbl{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;text-align:center;}
+.stat-icon{font-size:14px;opacity:.5;}
+
+/* ━━━ MAIN GRID ━━━ */
+.main{max-width:1100px;margin:0 auto;padding:0 24px;width:100%;}
+.section-title{
+  font-size:11px;font-weight:700;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;
+  margin-bottom:16px;display:flex;align-items:center;gap:10px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent);}
+
+/* CARDS GRID */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:48px;}
+
+.card{
+  position:relative;overflow:hidden;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:20px;padding:28px 28px 24px;
+  cursor:pointer;text-decoration:none;color:inherit;
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+  display:flex;flex-direction:column;gap:16px;
+  animation:fade-up .5s ease both;
+}
+.card:nth-child(1){animation-delay:.5s;}
+.card:nth-child(2){animation-delay:.6s;}
+.card:nth-child(3){animation-delay:.7s;}
+.card:hover{
+  transform:translateY(-4px);
+  border-color:var(--border2);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 0 1px var(--border2);
+}
+.card::before{
+  content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;
+  background:radial-gradient(ellipse 80% 80% at 50% 0%, rgba(255,255,255,0.04), transparent);
+  pointer-events:none;
+}
+.card:hover::before{opacity:1;}
+
+.card-icon{
+  width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  font-size:24px;flex-shrink:0;
+}
+.card-icon.blue{background:rgba(45,114,200,0.15);box-shadow:0 0 0 1px rgba(45,114,200,0.25);}
+.card-icon.green{background:rgba(29,185,84,0.12);box-shadow:0 0 0 1px rgba(29,185,84,0.22);}
+.card-icon.gold{background:rgba(200,168,75,0.12);box-shadow:0 0 0 1px rgba(200,168,75,0.22);}
+
+.card-body{flex:1;}
+.card-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:6px;}
+.card-desc{font-size:13px;font-weight:400;color:var(--muted);line-height:1.6;}
+
+.card-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:16px;border-top:1px solid var(--border);
+}
+.card-cta{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:700;color:var(--accent2);
+  transition:gap .2s;
+}
+.card:hover .card-cta{gap:10px;}
+.card-arrow{font-size:16px;}
+
+.card-tag{
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  padding:3px 9px;border-radius:100px;
+}
+.card-tag.live{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);}
+.card-tag.primary{background:rgba(45,114,200,0.12);border:1px solid rgba(45,114,200,0.28);color:var(--accent2);}
+.card-tag.secondary{background:rgba(200,168,75,0.10);border:1px solid rgba(200,168,75,0.22);color:var(--gold);}
+
+/* FEATURED CARD */
+.card.featured{
+  grid-column:1/-1;
+  flex-direction:row;align-items:center;
+  background:linear-gradient(135deg,rgba(45,114,200,0.10) 0%,rgba(45,114,200,0.04) 100%);
+  border-color:rgba(45,114,200,0.22);
+  padding:32px;gap:28px;
+}
+.card.featured:hover{border-color:rgba(45,114,200,0.40);}
+.card.featured .card-icon{width:72px;height:72px;border-radius:22px;font-size:34px;}
+.card.featured .card-title{font-size:22px;}
+.card.featured .card-desc{font-size:14px;max-width:500px;}
+
+/* ━━━ ACTIVITY FEED ━━━ */
+.feed-wrap{margin-bottom:48px;}
+.feed{display:flex;flex-direction:column;gap:8px;}
+.feed-item{
+  display:flex;align-items:center;gap:14px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:12px;padding:14px 18px;
+  animation:fade-up .4s ease both;
+  transition:border-color .2s;
+}
+.feed-item:hover{border-color:var(--border2);}
+.feed-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.feed-dot.green{background:var(--green);box-shadow:0 0 8px var(--green);}
+.feed-dot.amber{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+.feed-dot.blue{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.feed-dot.red{background:var(--red);box-shadow:0 0 6px var(--red);}
+.feed-text{flex:1;font-size:13px;font-weight:500;color:var(--text);}
+.feed-text span{color:var(--muted);font-weight:400;}
+.feed-time{font-size:11px;font-weight:600;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* ━━━ STATUS CARDS ━━━ */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:48px;}
+.scard{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:20px;
+  display:flex;flex-direction:column;gap:8px;
+  animation:fade-up .5s ease both;
+  transition:border-color .2s,transform .2s;
+}
+.scard:hover{border-color:var(--border2);transform:translateY(-2px);}
+.scard-header{display:flex;align-items:center;justify-content:space-between;}
+.scard-icon{font-size:18px;}
+.scard-ind{
+  width:8px;height:8px;border-radius:50%;
+}
+.scard-ind.on{background:var(--green);box-shadow:0 0 8px var(--green);}
+.scard-ind.off{background:var(--dim);}
+.scard-ind.warn{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+.scard-val{font-size:28px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1;}
+.scard-lbl{font-size:11px;font-weight:600;color:var(--muted);}
+
+/* ━━━ BOTTOM NAV ━━━ */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:center;
+  gap:8px;padding:10px 20px;
+  background:rgba(5,8,14,0.85);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border-top:1px solid var(--border);
+}
+.nav-btn{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  border-radius:12px;padding:9px 18px;
+  font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  color:var(--muted);cursor:pointer;text-decoration:none;
+  transition:all .15s;white-space:nowrap;
+}
+.nav-btn:hover{background:rgba(255,255,255,0.09);border-color:var(--border2);color:var(--text);}
+.nav-btn.primary{background:rgba(45,114,200,0.15);border-color:rgba(45,114,200,0.35);color:var(--accent2);}
+.nav-btn.primary:hover{background:rgba(45,114,200,0.25);border-color:rgba(45,114,200,0.55);}
+.nav-icon{font-size:14px;}
+
+/* ━━━ SHIMMER LOADER ━━━ */
+.shimmer{
+  background:linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+  border-radius:6px;
+}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* ━━━ RESPONSIVE ━━━ */
+@media(max-width:640px){
+  .hero{padding:60px 20px 40px;}
+  .stats-bar{display:grid;grid-template-columns:repeat(2,1fr);}
+  .card.featured{flex-direction:column;}
+  .main{padding:0 16px;}
+  .clock-widget{padding:14px 24px;}
+}
+@media(max-width:400px){
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .bottom-nav{gap:4px;}
+  .nav-btn{padding:8px 12px;font-size:11px;}
+}
+
+/* ━━━ PARTICLES ━━━ */
+.particle{
+  position:fixed;border-radius:50%;pointer-events:none;z-index:0;
+  background:var(--accent);opacity:0;
+  animation:particle-rise linear infinite;
+}
+@keyframes particle-rise{
+  0%{opacity:0;transform:translateY(0) scale(0);}
+  10%{opacity:.3;}
+  90%{opacity:.1;}
+  100%{opacity:0;transform:translateY(-100vh) scale(1);}
+}
+
+/* ━━━ COUNT STATUS BADGE ━━━ */
+.count-status{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 18px;border-radius:12px;font-size:13px;font-weight:700;
+  margin-top:12px;
+}
+.count-status.active{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);}
+.count-status.inactive{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--muted);}
+.count-status.suspended{background:rgba(224,155,53,0.10);border:1px solid rgba(224,155,53,0.28);color:var(--amber);}
+</style>
+</head>
+<body>
+
+<!-- PARTICLES -->
+<div id="particles"></div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="badge"><span class="badge-dot"></span>מערכת פעילה — חי</div>
+    <h1 class="hero-title">מרכז פיקוד<br>אביבים</h1>
+    <p class="hero-sub">מערכת ניהול ספירות | <strong>בית הסוהר אביבים</strong></p>
+    <div class="clock-widget">
+      <div class="clock-time" id="clockTime">--:--:--</div>
+      <div class="clock-date" id="clockDate">—</div>
+      <div class="clock-status"><span class="badge-dot"></span><span id="countStatusText">טוען...</span></div>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat">
+      <div class="stat-icon">🟢</div>
+      <div class="stat-val green" id="statActive">—</div>
+      <div class="stat-lbl">ספירות היום</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon">👥</div>
+      <div class="stat-val" id="statTotal">—</div>
+      <div class="stat-lbl">סה"כ אסירים</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-val amber" id="statPending">—</div>
+      <div class="stat-lbl">ממתינים</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon">✅</div>
+      <div class="stat-val green" id="statOk">—</div>
+      <div class="stat-lbl">תקין</div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+
+    <!-- MODULES -->
+    <div class="section-title">כניסה למודולים</div>
+    <div class="cards">
+
+      <!-- FEATURED: DEMO -->
+      <a href="demo.html" class="card featured">
+        <div class="card-icon blue">🖥️</div>
+        <div class="card-body">
+          <div class="card-title">פנל פיקוד ראשי</div>
+          <div class="card-desc">תצוגת מפקד מלאה עם סימולטור טלפון, מתג אפליקציות, ומעקב חי. מיועד לשימוש בחדר פיקוד.</div>
+          <div class="card-footer">
+            <div class="card-cta">כניסה לפנל <span class="card-arrow">←</span></div>
+            <div class="card-tag live">🔴 חי</div>
+          </div>
+        </div>
+      </a>
+
+      <!-- VIEWER -->
+      <a href="viewer.html" class="card">
+        <div class="card-icon blue">📊</div>
+        <div class="card-body">
+          <div class="card-title">תצוגת מפקד</div>
+          <div class="card-desc">לוח מחוונים בזמן אמת. מציג נתוני ספירה, סטטוסים, והתרעות לכל הכנפות.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-cta">פתח תצוגה <span class="card-arrow">←</span></div>
+          <div class="card-tag live">חי</div>
+        </div>
+      </a>
+
+      <!-- OPERATOR -->
+      <a href="test.html" class="card">
+        <div class="card-icon green">📱</div>
+        <div class="card-body">
+          <div class="card-title">מפעיל ספירה</div>
+          <div class="card-desc">ממשק מגע לדיווח ספירות בשטח. מותאם לשימוש חד-יד בנייד.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-cta">פתח מפעיל <span class="card-arrow">←</span></div>
+          <div class="card-tag primary">מובייל</div>
+        </div>
+      </a>
+
+      <!-- KIOSK -->
+      <a href="kiosk.html" class="card">
+        <div class="card-icon gold">🏛️</div>
+        <div class="card-body">
+          <div class="card-title">קיוסק ספירה</div>
+          <div class="card-desc">מצב קיוסק לתצוגה ציבורית. מסך מלא ללא אפשרות ניווט.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-cta">פתח קיוסק <span class="card-arrow">←</span></div>
+          <div class="card-tag secondary">תצוגה</div>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- LIVE STATUS -->
+    <div class="section-title">סטטוס מערכת</div>
+    <div class="status-grid" id="statusGrid">
+      <div class="scard">
+        <div class="scard-header"><span class="scard-icon">🔥</span><div class="scard-ind on" id="indFirebase"></div></div>
+        <div class="scard-val" id="svFirebase">—</div>
+        <div class="scard-lbl">Firebase — חיבור</div>
+      </div>
+      <div class="scard">
+        <div class="scard-header"><span class="scard-icon">📋</span><div class="scard-ind" id="indCount"></div></div>
+        <div class="scard-val" id="svCount">—</div>
+        <div class="scard-lbl">ספירה נוכחית</div>
+      </div>
+      <div class="scard">
+        <div class="scard-header"><span class="scard-icon">⏱️</span><div class="scard-ind on"></div></div>
+        <div class="scard-val" id="svTime">—</div>
+        <div class="scard-lbl">זמן מקומי</div>
+      </div>
+      <div class="scard">
+        <div class="scard-header"><span class="scard-icon">🌐</span><div class="scard-ind on"></div></div>
+        <div class="scard-val">PWA</div>
+        <div class="scard-lbl">אפליקציה מותקנת</div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY FEED -->
+    <div class="section-title">פעילות אחרונה</div>
+    <div class="feed-wrap">
+      <div class="feed" id="feed">
+        <div class="feed-item" style="animation-delay:.5s">
+          <div class="feed-dot blue"></div>
+          <div class="feed-text">המערכת עלתה לאוויר <span>— אתחול נתונים</span></div>
+          <div class="feed-time" id="ft1">--:--</div>
+        </div>
+        <div class="feed-item" style="animation-delay:.55s">
+          <div class="feed-dot green"></div>
+          <div class="feed-text">Firebase חיבור הוקם בהצלחה <span>— database/rtdb</span></div>
+          <div class="feed-time" id="ft2">--:--</div>
+        </div>
+        <div class="feed-item" style="animation-delay:.6s" id="feedCountItem">
+          <div class="feed-dot amber"></div>
+          <div class="feed-text" id="feedCountText">מחכה לנתוני ספירה... <span>— Firebase</span></div>
+          <div class="feed-time" id="ft3">--:--</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="demo.html" class="nav-btn primary">
+    <span class="nav-icon">🖥️</span> פנל פיקוד
+  </a>
+  <a href="viewer.html" class="nav-btn">
+    <span class="nav-icon">📊</span> מפקד
+  </a>
+  <a href="test.html" class="nav-btn">
+    <span class="nav-icon">📱</span> מפעיל
+  </a>
+  <a href="kiosk.html" class="nav-btn">
+    <span class="nav-icon">🏛️</span> קיוסק
+  </a>
+</nav>
+
+<script>
+/* ━━━ FIREBASE ━━━ */
+firebase.initializeApp({
+  apiKey:"AIzaSyBSV1dq1NgIr92wLbDelT5K6LgsOL9NQVQ",
+  authDomain:"dekel-prisoner-count-fcc36.firebaseapp.com",
+  databaseURL:"https://dekel-prisoner-count-fcc36-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"dekel-prisoner-count-fcc36",
+  storageBucket:"dekel-prisoner-count-fcc36.firebasestorage.app",
+  messagingSenderId:"174981013586",
+  appId:"1:174981013586:web:9e69e7ac42ddff46d4ff8b"
+});
+const db = firebase.database();
+
+/* ━━━ CLOCK ━━━ */
+function tick(){
+  const now = new Date();
+  const opts = {timeZone:'Asia/Jerusalem'};
+  const t = now.toLocaleTimeString('he-IL',{...opts,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const d = now.toLocaleDateString('he-IL',{...opts,weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('clockTime').textContent = t;
+  document.getElementById('clockDate').textContent = d;
+  document.getElementById('svTime').textContent = t.slice(0,5);
+
+  // Feed times
+  const ts = t.slice(0,5);
+  document.getElementById('ft1').textContent = ts;
+  document.getElementById('ft2').textContent = ts;
+  document.getElementById('ft3').textContent = ts;
+}
+setInterval(tick,1000); tick();
+
+/* ━━━ FIREBASE DATA ━━━ */
+let _connected = false;
+db.ref('.info/connected').on('value', snap => {
+  _connected = snap.val();
+  const ind = document.getElementById('indFirebase');
+  const sv  = document.getElementById('svFirebase');
+  ind.className = 'scard-ind ' + (_connected ? 'on' : 'off');
+  sv.textContent = _connected ? 'מחובר' : 'מנותק';
+});
+
+db.ref('data').on('value', snap => {
+  const d = snap.val() || {};
+  const active = !!(d.activeStart && !d.suspended);
+  const suspended = !!(d.activeStart && d.suspended);
+
+  // Count status text
+  const ind2 = document.getElementById('indCount');
+  const sv2  = document.getElementById('svCount');
+  const statusTxt = document.getElementById('countStatusText');
+  const feedTxt   = document.getElementById('feedCountText');
+
+  if(!d.activeStart){
+    ind2.className='scard-ind off';
+    sv2.textContent='לא פעיל';
+    statusTxt.textContent='אין ספירה פעילה';
+    feedTxt.innerHTML='אין ספירה פעילה כרגע <span>— ממתין</span>';
+    document.querySelector('.feed-dot','#feedCountItem')
+  } else if(suspended){
+    ind2.className='scard-ind warn';
+    sv2.textContent='מושהה';
+    statusTxt.textContent='ספירה מושהית';
+    feedTxt.innerHTML='ספירה פעילה — <strong>מושהית</strong> <span>— Firebase</span>';
+  } else {
+    ind2.className='scard-ind on';
+    sv2.textContent='פעיל';
+    statusTxt.textContent='ספירה פעילה';
+    feedTxt.innerHTML='ספירה פעילה ורצה <span>— Firebase</span>';
+    document.getElementById('feedCountItem').querySelector('.feed-dot').className='feed-dot green';
+  }
+
+  // Stats
+  document.getElementById('statTotal').textContent = d.total ?? '—';
+  document.getElementById('statPending').textContent = d.pending ?? '0';
+  document.getElementById('statOk').textContent = d.ok ?? '—';
+  document.getElementById('statActive').textContent = active ? '1' : '0';
+});
+
+/* ━━━ PARTICLES ━━━ */
+const container = document.getElementById('particles');
+for(let i=0;i<18;i++){
+  const p = document.createElement('div');
+  p.className='particle';
+  const size = Math.random()*3+1;
+  p.style.cssText = `
+    width:${size}px;height:${size}px;
+    left:${Math.random()*100}%;
+    bottom:${Math.random()*20}%;
+    animation-duration:${10+Math.random()*20}s;
+    animation-delay:${Math.random()*15}s;
+    background:${Math.random()>.5?'#2d72c8':'#1db954'};
+  `;
+  container.appendChild(p);
+}
+</script>
+</body>
+</html>
