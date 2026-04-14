@@ -111,7 +111,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;bac
 .slbl{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;display:flex;align-items:center;gap:5px;width:100%;}
 .slbl::after{content:'';flex:1;height:1px;background:var(--border);}
 .app-sw{display:flex;width:100%;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.70);border:1px solid var(--border);flex-shrink:0;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 2px 10px rgba(0,0,0,0.10);}
-.atab{flex:1;padding:5px 6px;font-family:'Heebo',sans-serif;font-size:10px;font-weight:700;color:var(--muted);background:transparent;border:none;cursor:pointer;transition:all .15s;text-align:center;}
+.atab{flex:1;padding:5px 6px;font-family:'Heebo',sans-serif;font-size:10px;font-weight:700;color:var(--muted);background:transparent;border:none;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;display:block;}
 .atab.on{background:rgba(37,99,235,0.15);color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,0.60);}
 .atab:hover:not(.on){background:rgba(0,0,0,0.05);color:var(--text);}
 
@@ -206,6 +206,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;bac
       <button class="atab on" id="tabTest"   onclick="switchApp('test')">מפעיל</button>
       <button class="atab"   id="tabViewer" onclick="switchApp('viewer')">מפקד</button>
       <button class="atab"   id="tabKiosk"  onclick="switchApp('kiosk')">קיוסק</button>
+      <a class="atab" href="https://agentskills.co.il/he/skills" target="_blank" rel="noopener noreferrer">מיומנויות</a>
     </div>
 
     <div class="color-picker-row" id="colorPickerRow" style="display:none;">
